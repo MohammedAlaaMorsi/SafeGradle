@@ -10,7 +10,10 @@ build/
 *.ipr
 out/
 !/**/src/main/resources/META-INF/plugin.xml
-!/**/src/test/testData/**/*
+
+# Run configurations (often personal preference, ignoring by default)
+.run/
+.vscode/
 
 # Kotlin
 .kotlin/
@@ -26,8 +29,9 @@ local.properties
 # Logs
 *.log
 
-# Qodana
+# Qodana & Codecov (previously removed)
 .qodana/
+codecov.yml
 
 # IntelliJ Platform Plugin
 .intellijPlatform/
