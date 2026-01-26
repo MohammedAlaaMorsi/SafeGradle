@@ -10,6 +10,7 @@
 
     <extensions defaultExtensionNs="com.intellij">
         <notificationGroup id="Security Scan Results" displayType="BALLOON"/>
+        <editorNotificationProvider implementation="com.github.safegradle.security.SafeGradleNotificationProvider"/>
     </extensions>
 
     <actions>
