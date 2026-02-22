@@ -27,29 +27,35 @@ class OpenSafeReportDialog(
         warningLabel.icon = UIManager.getIcon("OptionPane.warningIcon")
         panel.add(warningLabel, BorderLayout.NORTH)
 
-        val listModel = DefaultListModel<String>()
+        val htmlBuilder = StringBuilder()
+        htmlBuilder.append("<html><body style='font-family: sans-serif; font-size: 10px; margin: 10px;'>")
+        
         violations.forEach { (file, fileViolations) ->
-            listModel.addElement("<html><b>${file.path}</b></html>")
+            htmlBuilder.append("<b>${file.path}</b><br>")
+            
             fileViolations.forEach {
                 val riskHtml = when (it.riskLevel) {
                     RiskLevel.HIGH -> "<font color='red'>[HIGH]</font>"
-                    RiskLevel.MEDIUM -> "<font color='orange'>[MEDIUM]</font>"
-                    RiskLevel.LOW -> "<font color='yellow'>[LOW]</font>"
+                    RiskLevel.MEDIUM -> "<font color='#FF8C00'>[MEDIUM]</font>" // Orange
+                    RiskLevel.LOW -> "<font color='#D4D400'>[LOW]</font>" // Yellow
                 }
-                listModel.addElement("  $riskHtml Line ${it.line}: ${it.message}")
+                htmlBuilder.append("&nbsp;&nbsp;$riskHtml Line ${it.line}: ${it.message}<br>")
             }
-            listModel.addElement(" ") // spacer
+            htmlBuilder.append("<br>") // spacer
         }
+        htmlBuilder.append("</body></html>")
 
-        val list = JBList(listModel)
-        list.selectionMode = ListSelectionModel.SINGLE_SELECTION
-        panel.add(JBScrollPane(list), BorderLayout.CENTER)
+        val htmlPane = JEditorPane("text/html", htmlBuilder.toString())
+        htmlPane.isEditable = false
+        htmlPane.isOpaque = false // Matches IDE theme background
+        
+        panel.add(JBScrollPane(htmlPane), BorderLayout.CENTER)
 
         return panel
     }
 
     override fun createActions(): Array<Action> {
-        val cancelAction = DialogWrapperExitAction("Cancel Open", CANCEL_EXIT_CODE)
+        val cancelAction = DialogWrapperExitAction("Cancel", CANCEL_EXIT_CODE)
         cancelAction.putValue(Action.DEFAULT, true)
         
         val proceedAction = object : DialogWrapperAction("Open Project Anyway") {
