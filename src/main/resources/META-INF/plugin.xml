@@ -1,6 +1,6 @@
 <!-- Plugin Configuration File. Read more: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
 <idea-plugin>
-    <id>com.github.safegradle</id>
+    <id>com.mohammedalaamorsi.safegradle</id>
     <name>SafeGradle Security Scanner</name>
     <vendor>SafeGradle</vendor>
 
@@ -10,19 +10,19 @@
 
     <extensions defaultExtensionNs="com.intellij">
         <notificationGroup id="Security Scan Results" displayType="BALLOON"/>
-        <editorNotificationProvider implementation="com.github.safegradle.security.SafeGradleNotificationProvider"/>
+        <editorNotificationProvider implementation="com.mohammedalaamorsi.safegradle.SafeGradleNotificationProvider"/>
     </extensions>
 
     <applicationListeners>
-        <listener class="com.github.safegradle.security.TrustDialogInjector" topic="com.intellij.ide.AppLifecycleListener"/>
+        <listener class="com.mohammedalaamorsi.safegradle.TrustDialogInjector" topic="com.intellij.ide.AppLifecycleListener"/>
     </applicationListeners>
 
     <actions>
-        <action id="com.github.safegradle.scan" class="com.github.safegradle.security.ScanAction" text="Scan Build Scripts for Security Risks" description="Scans gradle files for malicious code">
+        <action id="com.mohammedalaamorsi.safegradle.scan" class="com.github.safegradle.security.ScanAction" text="Scan Build Scripts for Security Risks" description="Scans gradle files for malicious code">
             <add-to-group group-id="ToolsMenu" anchor="last"/>
         </action>
         
-        <action id="com.github.safegradle.openSafe" class="com.github.safegradle.security.OpenSafeProjectAction" text="Open in SafeGradle" icon="AllIcons.Actions.Shield" description="Select a project folder and scan for malicious code before opening">
+        <action id="com.github.safegradle.openSafe" class="com.mohammedalaamorsi.safegradle.OpenSafeProjectAction" text="Open in SafeGradle" icon="AllIcons.Actions.Shield" description="Select a project folder and scan for malicious code before opening">
             <add-to-group group-id="WelcomeScreen.QuickStart" anchor="first"/>
             <add-to-group group-id="MainMenu" anchor="last"/>
         </action>

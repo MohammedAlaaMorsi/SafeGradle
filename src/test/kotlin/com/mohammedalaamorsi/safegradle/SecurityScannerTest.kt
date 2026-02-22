@@ -1,7 +1,6 @@
-package com.github.safegradle.security
+package com.mohammedalaamorsi.safegradle
 
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
-import org.junit.Test
 
 class SecurityScannerTest : BasePlatformTestCase() {
 

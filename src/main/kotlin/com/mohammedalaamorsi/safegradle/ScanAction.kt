@@ -1,4 +1,4 @@
-package com.github.safegradle.security
+package com.mohammedalaamorsi.safegradle
 
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
@@ -6,15 +6,15 @@ import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.progress.Task
-import com.intellij.openapi.project.Project
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.progress.ProgressIndicator
 
 class ScanAction : AnAction() {
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
 
         ProgressManager.getInstance().run(object : Task.Modal(project, "Scanning for Security Risks", true) {
-            override fun run(indicator: com.intellij.openapi.progress.ProgressIndicator) {
+            override fun run(indicator: ProgressIndicator) {
                 indicator.text = "Scanning build scripts..."
                 
                 val scanner = SecurityScanner()

@@ -1,4 +1,4 @@
-package com.github.safegradle.security
+package com.mohammedalaamorsi.safegradle
 
 import com.intellij.openapi.vfs.VirtualFile
 import java.util.regex.Pattern

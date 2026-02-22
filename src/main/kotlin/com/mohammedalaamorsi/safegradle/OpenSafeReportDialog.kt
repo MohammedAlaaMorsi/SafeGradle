@@ -1,12 +1,11 @@
-package com.github.safegradle.security
+package com.mohammedalaamorsi.safegradle
 
-import com.intellij.ide.impl.ProjectUtil
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.ui.components.JBList
 import com.intellij.ui.components.JBScrollPane
 import java.awt.BorderLayout
 import java.awt.Dimension
+import java.awt.event.ActionEvent
 import javax.swing.*
 
 class OpenSafeReportDialog(
@@ -59,9 +58,8 @@ class OpenSafeReportDialog(
         cancelAction.putValue(Action.DEFAULT, true)
         
         val proceedAction = object : DialogWrapperAction("Open Project Anyway") {
-            override fun doAction(e: java.awt.event.ActionEvent?) {
+            override fun doAction(e: ActionEvent?) {
                 close(OK_EXIT_CODE)
-                ProjectUtil.openOrImport(projectPath, null, true)
             }
         }
         

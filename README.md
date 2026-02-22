@@ -1,8 +1,8 @@
 # SafeGradle
 
 ![Build](https://github.com/MohammedAlaaMorsi/SafeGradle/workflows/Build/badge.svg)
-[![Version](https://img.shields.io/jetbrains/plugin/v/30316-safegradle.svg)](https://plugins.jetbrains.com/plugin/30316-safegradle)
-[![Downloads](https://img.shields.io/jetbrains/plugin/d/30316-safegradle.svg)](https://plugins.jetbrains.com/plugin/30316-safegradle)
+[![Version](https://img.shields.io/jetbrains/plugin/v/30319-safegradle.svg)](https://plugins.jetbrains.com/plugin/30316-safegradle)
+[![Downloads](https://img.shields.io/jetbrains/plugin/d/30319-safegradle.svg)](https://plugins.jetbrains.com/plugin/30316-safegradle)
 
 
 

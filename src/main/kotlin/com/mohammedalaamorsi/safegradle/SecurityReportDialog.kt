@@ -1,4 +1,4 @@
-package com.github.safegradle.security
+package com.mohammedalaamorsi.safegradle
 
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
@@ -7,10 +7,12 @@ import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.table.JBTable
 import java.awt.BorderLayout
 import java.awt.Color
+import java.awt.Component
 import java.awt.Dimension
 import javax.swing.JComponent
 import javax.swing.JLabel
 import javax.swing.JPanel
+import javax.swing.JTable
 import javax.swing.table.DefaultTableModel
 import javax.swing.table.DefaultTableCellRenderer
 
@@ -54,8 +56,8 @@ class SecurityReportDialog(
         // Custom renderer for Risk Level (Color coding)
         table.columnModel.getColumn(2).cellRenderer = object : DefaultTableCellRenderer() {
             override fun getTableCellRendererComponent(
-                table: javax.swing.JTable?, value: Any?, isSelected: Boolean, hasFocus: Boolean, row: Int, column: Int
-            ): java.awt.Component {
+                table: JTable?, value: Any?, isSelected: Boolean, hasFocus: Boolean, row: Int, column: Int
+            ): Component {
                 val c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column)
                 if (value is RiskLevel) {
                     foreground = when (value) {

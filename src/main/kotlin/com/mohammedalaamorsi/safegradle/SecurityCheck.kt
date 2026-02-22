@@ -1,7 +1,6 @@
-package com.github.safegradle.security
+package com.mohammedalaamorsi.safegradle
 
 import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.psi.PsiElement
 
 enum class RiskLevel {
     HIGH,    // Remote execution, shell commands, sensitive file exfiltration

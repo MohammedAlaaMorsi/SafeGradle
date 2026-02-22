@@ -1,18 +1,31 @@
-package com.github.safegradle.security
+package com.mohammedalaamorsi.safegradle
 
 import com.intellij.ide.AppLifecycleListener
 import com.intellij.ide.DataManager
+import com.intellij.ide.RecentProjectsManager
 import com.intellij.openapi.actionSystem.ActionUiKind
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.ex.ActionUtil
-import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.progress.ProgressIndicator
+import com.intellij.openapi.progress.ProgressManager
+import com.intellij.openapi.progress.Task
+import com.intellij.openapi.project.Project
+import com.intellij.openapi.project.ProjectManager
+import com.intellij.openapi.ui.DialogWrapper
+import com.intellij.openapi.vfs.LocalFileSystem
+import com.intellij.openapi.vfs.VirtualFile
 import java.awt.AWTEvent
 import java.awt.Container
 import java.awt.Toolkit
 import java.awt.Window
 import java.awt.event.AWTEventListener
 import java.awt.event.WindowEvent
+import java.io.File
+import java.nio.file.Path
+import java.util.LinkedList
 import javax.swing.JButton
+import javax.swing.JDialog
+import javax.swing.JFrame
 import javax.swing.JPanel
 import javax.swing.SwingUtilities
 import javax.swing.Timer
@@ -62,14 +75,14 @@ class TrustDialogInjector : AppLifecycleListener {
                         
                         // Try to find the exact project path
                         var projectPath: String? = null
-                        val title = (window as? javax.swing.JDialog)?.title ?: (window as? javax.swing.JFrame)?.title ?: ""
+                        val title = (window as? JDialog)?.title ?: (window as? JFrame)?.title ?: ""
                         val projectNameMatch = Regex("'([^']+)'").find(title)
                         val projectName = projectNameMatch?.groupValues?.get(1)
 
                         // 1. Try Recent Projects
                         try {
                             projectName?.let { pName ->
-                                val recentManager = com.intellij.ide.RecentProjectsManager.getInstance()
+                                val recentManager = RecentProjectsManager.getInstance()
                                     val method = recentManager.javaClass.getMethod("getRecentPaths")
                                     val paths = method.invoke(recentManager) as? List<*>
                                     projectPath = paths?.firstOrNull { it is String && (it.endsWith("/$pName") || it.endsWith("\\$pName")) } as? String
@@ -79,7 +92,7 @@ class TrustDialogInjector : AppLifecycleListener {
                         // 2. Try Open Projects
                         try {
                             if (projectPath == null && projectName != null) {
-                                val openProjects = com.intellij.openapi.project.ProjectManager.getInstance().openProjects
+                                val openProjects = ProjectManager.getInstance().openProjects
                                 projectPath = openProjects.firstOrNull { it.name == projectName }?.basePath
                             }
                         } catch (e: Exception) {}
@@ -87,15 +100,15 @@ class TrustDialogInjector : AppLifecycleListener {
                         // 3. Try Reflection on DialogWrapper
                         try {
                             if (projectPath == null) {
-                                val wrapper = com.intellij.openapi.ui.DialogWrapper.findInstance(window)
+                                val wrapper = DialogWrapper.findInstance(window)
                                 if (wrapper != null) {
                                     for (field in wrapper.javaClass.declaredFields) {
                                         field.isAccessible = true
                                         val value = field.get(wrapper)
-                                        if (value is com.intellij.openapi.project.Project) { projectPath = value.basePath; break }
-                                        if (value is java.nio.file.Path) { projectPath = value.toAbsolutePath().toString(); break }
-                                        if (value is java.io.File) { projectPath = value.absolutePath; break }
-                                        if (value is com.intellij.openapi.vfs.VirtualFile) { projectPath = value.path; break }
+                                        if (value is Project) { projectPath = value.basePath; break }
+                                        if (value is Path) { projectPath = value.toAbsolutePath().toString(); break }
+                                        if (value is File) { projectPath = value.absolutePath; break }
+                                        if (value is VirtualFile) { projectPath = value.path; break }
                                         if (value is String && (value.endsWith("/$projectName") || value.endsWith("\\$projectName"))) { projectPath = value; break }
                                     }
                                 }
@@ -103,11 +116,11 @@ class TrustDialogInjector : AppLifecycleListener {
                         } catch (e: Exception) {}
 
                         if (projectPath != null) {
-                            val vFile = com.intellij.openapi.vfs.LocalFileSystem.getInstance().findFileByPath(projectPath!!)
+                            val vFile = LocalFileSystem.getInstance().findFileByPath(projectPath!!)
                             if (vFile != null) {
-                                com.intellij.openapi.progress.ProgressManager.getInstance().run(
-                                    object : com.intellij.openapi.progress.Task.Modal(null, "Scanning build scripts...", true) {
-                                        override fun run(indicator: com.intellij.openapi.progress.ProgressIndicator) {
+                                ProgressManager.getInstance().run(
+                                    object : Task.Modal(null, "Scanning build scripts...", true) {
+                                        override fun run(indicator: ProgressIndicator) {
                                             val scanner = SecurityScanner()
                                             val violations = scanner.scanDirectory(vFile)
                                             
@@ -154,7 +167,7 @@ class TrustDialogInjector : AppLifecycleListener {
 
     // Breadth-first search for the JPanel containing the "Trust Project" button
     private fun findButtonPanel(container: Container): JPanel? {
-        val queue = java.util.LinkedList<Container>()
+        val queue = LinkedList<Container>()
         queue.add(container)
 
         while (queue.isNotEmpty()) {

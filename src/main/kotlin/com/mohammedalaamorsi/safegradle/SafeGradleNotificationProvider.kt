@@ -1,4 +1,4 @@
-package com.github.safegradle.security
+package com.mohammedalaamorsi.safegradle
 
 import com.intellij.ide.DataManager
 import com.intellij.ide.impl.isTrusted
@@ -31,7 +31,7 @@ class SafeGradleNotificationProvider : EditorNotificationProvider {
             panel.text = "This project is in Safe Mode. Scan files with SafeGradle to detect potential security risks before trusting."
             
             panel.createActionLabel("Scan with SafeGradle") {
-                val action = ActionManager.getInstance().getAction("com.github.safegradle.scan")
+                val action = ActionManager.getInstance().getAction("com.mohammedalaamorsi.safegradle.scan")
                 if (action != null) {
                     val context = DataManager.getInstance().getDataContext(panel)
                     val event = AnActionEvent.createEvent(context, action.templatePresentation.clone(), "SafeModeBanner", ActionUiKind.NONE, null)
