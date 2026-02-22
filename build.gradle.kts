@@ -156,3 +156,11 @@ intellijPlatformTesting {
         }
     }
 }
+
+tasks.named("buildSearchableOptions").configure {
+    enabled = false
+}
+
+tasks.named("prepareJarSearchableOptions").configure {
+    enabled = false
+}

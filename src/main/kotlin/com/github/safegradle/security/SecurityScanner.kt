@@ -1,37 +1,37 @@
 package com.github.safegradle.security
 
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.project.guessProjectDir
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.search.FilenameIndex
 import com.intellij.psi.search.GlobalSearchScope
 
-class SecurityScanner(private val project: Project) {
+class SecurityScanner() {
     private val checks = listOf(
         ShellExecutionCheck(),
         NetworkActivityCheck(),
-        SensitiveFileCheck()
+        SensitiveFileCheck(),
+        ObfuscationCheck(),
+        SystemTamperingCheck()
     )
 
-    fun scanProject(): Map<VirtualFile, List<SecurityViolation>> {
-        val results = mutableMapOf<VirtualFile, List<SecurityViolation>>()
-        val scope = GlobalSearchScope.projectScope(project)
+    fun scanProject(project: Project): Map<VirtualFile, List<SecurityViolation>> {
+        val baseDir = project.guessProjectDir() ?: return emptyMap()
+        return scanDirectory(baseDir)
+    }
 
-        // Find all Gradle-related files
+    fun scanDirectory(dir: VirtualFile): Map<VirtualFile, List<SecurityViolation>> {
+        val results = mutableMapOf<VirtualFile, List<SecurityViolation>>()
+        
+        // Find all Gradle-related files via manual recursion since we might not have a Project index yet
         val fileNames = listOf(
             "build.gradle", "build.gradle.kts",
             "settings.gradle", "settings.gradle.kts",
             "gradle.properties"
         )
-
-        val filesToScan = mutableListOf<VirtualFile>()
         
-        fileNames.forEach { name ->
-            filesToScan.addAll(FilenameIndex.getVirtualFilesByName(name, scope))
-        }
-
-        // Also scan buildSrc if it exists (simplified: just looking for files with these names anywhere)
-         // Ideally we'd scan all .gradle/.kts files, but let's stick to name-based for MVP to avoid noise.
-         // Let's also add a generic scan for strings "init.gradle" or similar if they show up.
+        val filesToScan = mutableListOf<VirtualFile>()
+        collectFiles(dir, fileNames, filesToScan)
 
         for (file in filesToScan) {
             if (!file.isValid || file.isDirectory) continue
@@ -55,5 +55,22 @@ class SecurityScanner(private val project: Project) {
         }
 
         return results
+    }
+
+    private fun collectFiles(dir: VirtualFile, fileNames: List<String>, result: MutableList<VirtualFile>) {
+        if (!dir.isDirectory) return
+        
+        // Skip common large directories to speed up scanning
+        if (dir.name == ".git" || dir.name == ".gradle" || dir.name == ".idea" || dir.name == "build") {
+            return
+        }
+
+        for (child in dir.children) {
+            if (child.isDirectory) {
+                collectFiles(child, fileNames, result)
+            } else if (fileNames.contains(child.name)) {
+                result.add(child)
+            }
+        }
     }
 }

@@ -17,8 +17,8 @@ class ScanAction : AnAction() {
             override fun run(indicator: com.intellij.openapi.progress.ProgressIndicator) {
                 indicator.text = "Scanning build scripts..."
                 
-                val scanner = SecurityScanner(project)
-                val violations = scanner.scanProject()
+                val scanner = SecurityScanner()
+                val violations = scanner.scanProject(project)
 
                 ApplicationManager.getApplication().invokeLater {
                     if (violations.isEmpty()) {

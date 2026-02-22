@@ -13,9 +13,18 @@
         <editorNotificationProvider implementation="com.github.safegradle.security.SafeGradleNotificationProvider"/>
     </extensions>
 
+    <applicationListeners>
+        <listener class="com.github.safegradle.security.TrustDialogInjector" topic="com.intellij.ide.AppLifecycleListener"/>
+    </applicationListeners>
+
     <actions>
         <action id="com.github.safegradle.scan" class="com.github.safegradle.security.ScanAction" text="Scan Build Scripts for Security Risks" description="Scans gradle files for malicious code">
             <add-to-group group-id="ToolsMenu" anchor="last"/>
+        </action>
+        
+        <action id="com.github.safegradle.openSafe" class="com.github.safegradle.security.OpenSafeProjectAction" text="Open in SafeGradle" icon="AllIcons.Actions.Shield" description="Select a project folder and scan for malicious code before opening">
+            <add-to-group group-id="WelcomeScreen.QuickStart" anchor="first"/>
+            <add-to-group group-id="MainMenu" anchor="last"/>
         </action>
     </actions>
 </idea-plugin>

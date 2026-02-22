@@ -2,6 +2,7 @@ package com.github.safegradle.security
 
 import com.intellij.ide.DataManager
 import com.intellij.ide.impl.isTrusted
+import com.intellij.ide.trustedProjects.TrustedProjects
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.fileEditor.FileEditor
@@ -19,7 +20,7 @@ class SafeGradleNotificationProvider : EditorNotificationProvider {
         file: VirtualFile
     ): Function<in FileEditor, out JComponent?>? {
         // Only show if the project is NOT trusted (Safe Mode)
-        if (project.isTrusted()) {
+        if (TrustedProjects.isProjectTrusted(project)) {
             return null
         }
         

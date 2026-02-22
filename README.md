@@ -8,7 +8,7 @@
 - [x] Create a new [IntelliJ Platform Plugin Template][template] project.
 - [ ] Get familiar with the [template documentation][template].
 - [ ] Adjust the [pluginGroup](./gradle.properties) and [pluginName](./gradle.properties), as well as the [id](./src/main/resources/META-INF/plugin.xml) and [sources package](./src/main/kotlin).
-- [ ] Adjust the plugin description in `README` (see [Tips][docs:plugin-description])
+- [x] Adjust the plugin description in `README` (see [Tips][docs:plugin-description])
 - [ ] Review the [Legal Agreements](https://plugins.jetbrains.com/docs/marketplace/legal-agreements.html?from=IJPluginTemplate).
 - [ ] [Publish a plugin manually](https://plugins.jetbrains.com/docs/intellij/publishing-plugin.html?from=IJPluginTemplate) for the first time.
 - [ ] Set the `MARKETPLACE_ID` in the above README badges. You can obtain it once the plugin is published to JetBrains Marketplace.
@@ -18,11 +18,14 @@
 - [ ] Configure the [CODECOV_TOKEN](https://docs.codecov.com/docs/quick-start) secret for automated test coverage reports on PRs
 
 <!-- Plugin description -->
-This Fancy IntelliJ Platform Plugin is going to be your implementation of the brilliant ideas that you have.
+**SafeGradle** is an IntelliJ Platform plugin designed to enhance your security by scanning project build scripts for malicious code *before* you open them.
 
-This specific section is a source for the [plugin.xml](/src/main/resources/META-INF/plugin.xml) file which will be extracted by the [Gradle](/build.gradle.kts) during the build process.
+### Features
+- **Pre-opening Scanning**: Easily open projects with SafeGradle from the native "Trust Project" dialog or the Welcome Screen to scan projects for vulnerabilities before loading them.
+- **Manual Actions**: Scan build scripts (like `build.gradle.kts`) within your currently opened project and display immediate notifications for any detected security risks.
+- **Secure Workflow**: Adds an essential layer of safety when exploring unverified or open-source repositories to ensure that the code you trust is safe.
 
-To keep everything working, do not remove `<!-- ... -->` sections. 
+Keep your IDE secure and code with confidence.
 <!-- Plugin description end -->
 
 ## Installation

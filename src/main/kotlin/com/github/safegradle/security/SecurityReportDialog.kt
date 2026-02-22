@@ -36,7 +36,7 @@ class SecurityReportDialog(
 
         violations.forEach { (file, list) ->
             list.forEach { violation ->
-                model.addRow(arrayOf(
+                model.addRow(arrayOf<Any>(
                     file.name,
                     violation.line,
                     violation.riskLevel,
