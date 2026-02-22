@@ -1,6 +1,10 @@
 package com.github.safegradle.security
 
 import com.intellij.ide.AppLifecycleListener
+import com.intellij.ide.DataManager
+import com.intellij.openapi.actionSystem.ActionUiKind
+import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.actionSystem.ex.ActionUtil
 import com.intellij.openapi.application.ApplicationManager
 import java.awt.AWTEvent
 import java.awt.Container
@@ -24,9 +28,7 @@ class TrustDialogInjector : AppLifecycleListener {
         }
     }
 
-    override fun appStarted() {
-        Toolkit.getDefaultToolkit().addAWTEventListener(listener, AWTEvent.WINDOW_EVENT_MASK)
-    }
+
 
     override fun appFrameCreated(commandLineArgs: MutableList<String>) {
         Toolkit.getDefaultToolkit().removeAWTEventListener(listener)
@@ -66,15 +68,11 @@ class TrustDialogInjector : AppLifecycleListener {
 
                         // 1. Try Recent Projects
                         try {
-                            if (projectName != null) {
+                            projectName?.let { pName ->
                                 val recentManager = com.intellij.ide.RecentProjectsManager.getInstance()
-                                if (recentManager != null) {
-                                    // recentManager.recentPaths is sometimes a list, sometimes unavailable depending on IntelliJ version.
-                                    // Use reflection to be safe since it's an internal class anyway.
                                     val method = recentManager.javaClass.getMethod("getRecentPaths")
                                     val paths = method.invoke(recentManager) as? List<*>
-                                    projectPath = paths?.firstOrNull { it is String && (it.endsWith("/$projectName") || it.endsWith("\\$projectName")) } as? String
-                                }
+                                    projectPath = paths?.firstOrNull { it is String && (it.endsWith("/$pName") || it.endsWith("\\$pName")) } as? String
                             }
                         } catch (e: Exception) {}
 
@@ -137,10 +135,9 @@ class TrustDialogInjector : AppLifecycleListener {
                         // Fallback if we couldn't resolve the path
                         window.dispose()
                         val action = OpenSafeProjectAction()
-                        val event = com.intellij.openapi.actionSystem.AnActionEvent.createFromAnAction(
-                            action, null, "TrustDialogInjector", com.intellij.openapi.actionSystem.DataContext.EMPTY_CONTEXT
-                        )
-                        action.actionPerformed(event)
+                        val context = DataManager.getInstance().getDataContext(window)
+                        val event = AnActionEvent.createEvent(context, action.templatePresentation.clone(), "TrustDialogInjector", ActionUiKind.NONE, null)
+                        ActionUtil.performAction(action, event)
                     }
 
                     buttonsPanel.add(safeButton, 0)

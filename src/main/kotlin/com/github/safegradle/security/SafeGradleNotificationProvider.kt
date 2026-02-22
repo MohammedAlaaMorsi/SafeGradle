@@ -4,7 +4,9 @@ import com.intellij.ide.DataManager
 import com.intellij.ide.impl.isTrusted
 import com.intellij.ide.trustedProjects.TrustedProjects
 import com.intellij.openapi.actionSystem.ActionManager
+import com.intellij.openapi.actionSystem.ActionUiKind
 import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.actionSystem.ex.ActionUtil
 import com.intellij.openapi.fileEditor.FileEditor
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
@@ -32,8 +34,8 @@ class SafeGradleNotificationProvider : EditorNotificationProvider {
                 val action = ActionManager.getInstance().getAction("com.github.safegradle.scan")
                 if (action != null) {
                     val context = DataManager.getInstance().getDataContext(panel)
-                    val event = AnActionEvent.createFromAnAction(action, null, "SafeModeBanner", context)
-                    action.actionPerformed(event)
+                    val event = AnActionEvent.createEvent(context, action.templatePresentation.clone(), "SafeModeBanner", ActionUiKind.NONE, null)
+                    ActionUtil.performAction(action, event)
                 }
             }
             
