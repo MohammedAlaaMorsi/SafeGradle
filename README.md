@@ -7,12 +7,15 @@
 
 
 <!-- Plugin description -->
-**SafeGradle** is an IntelliJ Platform plugin designed to enhance your security by scanning project build scripts for malicious code *before* you open them.
+**SafeGradle** is a professional-grade security scanner for IntelliJ IDEA that protects your development environment from malicious Gradle build scripts. It identifies security risks like hidden network calls, shell execution, and credential leaks *before* they can compromise your system.
 
-### Features
-- **Pre-opening Scanning**: Easily open projects with SafeGradle from the native "Trust Project" dialog or the Welcome Screen to scan projects for vulnerabilities before loading them.
-- **Manual Actions**: Scan build scripts (like `build.gradle.kts`) within your currently opened project and display immediate notifications for any detected security risks.
-- **Secure Workflow**: Adds an essential layer of safety when exploring unverified or open-source repositories to ensure that the code you trust is safe.
+### 🛡️ Key Features
+- **Semantic PSI Analysis**: High-precision scanning using IntelliJ's Program Structure Interface (PSI) to detect obfuscated or dynamically constructed malicious code in both Kotlin (`.kts`) and Groovy scripts.
+- **Pre-opening Security**: Integrated "Open in SafeGradle" actions on the Welcome Screen and "Trust Project" dialogs allow you to audit open-source projects before fully loading them.
+- **Software Composition Analysis (SCA)**: Automatically detects dependencies with known vulnerabilities (CVEs) to prevent supply chain attacks.
+- **Team-Wide Configuration**: Share security policies across your team using a `.safegradle.yml` file in your project root.
+- **Real-time Protection**: Editor annotations, gutter icons, and Alt+Enter quick-fixes provide immediate feedback as you edit build scripts.
+- **Incremental Scanning**: Intelligent caching ensures scans are lightning-fast, only re-checking files when they change.
 
 Keep your IDE secure and code with confidence.
 <!-- Plugin description end -->

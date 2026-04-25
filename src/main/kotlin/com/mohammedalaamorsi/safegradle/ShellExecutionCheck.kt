@@ -1,5 +1,6 @@
 package com.mohammedalaamorsi.safegradle
 
+import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 import java.util.regex.Pattern
 
@@ -16,7 +17,7 @@ class ShellExecutionCheck : SecurityCheck {
         Pattern.compile("/bin/sh|/bin/bash|cmd\\.exe", Pattern.CASE_INSENSITIVE)
     )
 
-    override fun check(file: VirtualFile, content: String): List<SecurityViolation> {
+    override fun check(file: VirtualFile, content: String, project: Project?, teamConfig: YamlConfig?): List<SecurityViolation> {
         val violations = mutableListOf<SecurityViolation>()
         val lines = content.lines()
 

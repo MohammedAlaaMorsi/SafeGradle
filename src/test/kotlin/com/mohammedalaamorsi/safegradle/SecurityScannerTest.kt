@@ -18,7 +18,7 @@ class SecurityScannerTest : BasePlatformTestCase() {
         // So we will test the logic directly if possible, or use the scanner with the test project.
         
         val file = myFixture.configureByText("build.gradle", maliciousCode)
-        val violations = check.check(file.virtualFile, maliciousCode)
+        val violations = check.check(file.virtualFile, maliciousCode, project)
         
         assertNotEmpty(violations)
         assertEquals(RiskLevel.HIGH, violations[0].riskLevel)
@@ -33,7 +33,7 @@ class SecurityScannerTest : BasePlatformTestCase() {
         """.trimIndent()
         
         val file = myFixture.configureByText("build.gradle.kts", maliciousCode)
-        val violations = check.check(file.virtualFile, maliciousCode)
+        val violations = check.check(file.virtualFile, maliciousCode, project)
         
         assertNotEmpty(violations)
         assertEquals(RiskLevel.MEDIUM, violations[0].riskLevel)
@@ -46,7 +46,7 @@ class SecurityScannerTest : BasePlatformTestCase() {
         """.trimIndent()
         
         val file = myFixture.configureByText("settings.gradle", maliciousCode)
-        val violations = check.check(file.virtualFile, maliciousCode)
+        val violations = check.check(file.virtualFile, maliciousCode, project)
         
         assertNotEmpty(violations)
         assertEquals(RiskLevel.HIGH, violations[0].riskLevel)
@@ -63,7 +63,7 @@ class SecurityScannerTest : BasePlatformTestCase() {
         """.trimIndent()
 
         val file = myFixture.configureByText("build.gradle.kts", maliciousCode)
-        val violations = check.check(file.virtualFile, maliciousCode)
+        val violations = check.check(file.virtualFile, maliciousCode, project)
 
         assertNotEmpty(violations)
         assertTrue(violations.any { it.message.contains("java.util.Base64") })
@@ -79,7 +79,7 @@ class SecurityScannerTest : BasePlatformTestCase() {
         """.trimIndent()
 
         val file = myFixture.configureByText("build.gradle", maliciousCode)
-        val violations = check.check(file.virtualFile, maliciousCode)
+        val violations = check.check(file.virtualFile, maliciousCode, project)
 
         assertNotEmpty(violations)
         assertTrue(violations.any { it.message.contains("TrustManager") })

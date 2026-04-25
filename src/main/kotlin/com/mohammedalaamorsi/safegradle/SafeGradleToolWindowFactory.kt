@@ -55,14 +55,23 @@ class SafeGradleToolWindowFactory : ToolWindowFactory {
             topPanel.add(headerLabel, BorderLayout.NORTH)
             headerLabel.border = EmptyBorder(10, 10, 0, 10)
             
+            val labelFont = headerLabel.font.deriveFont(Font.BOLD, 20f)
+            highCountLabel.font = labelFont
+            mediumCountLabel.font = labelFont
+            lowCountLabel.font = labelFont
+            
+            highCountLabel.border = EmptyBorder(5, 5, 5, 15)
+            mediumCountLabel.border = EmptyBorder(5, 5, 5, 15)
+            lowCountLabel.border = EmptyBorder(5, 5, 5, 15)
+
             summaryPanel.add(highCountLabel)
             summaryPanel.add(mediumCountLabel)
             summaryPanel.add(lowCountLabel)
             
             exportButton.isVisible = false
+            exportButton.font = headerLabel.font.deriveFont(Font.BOLD, 14f)
+            exportButton.preferredSize = Dimension(150, 40)
             exportButton.addActionListener {
-                val descriptor = FileChooserDescriptorFactory.createSingleFileDescriptor()
-                descriptor.title = "Save Security Report"
                 
                 val path = Messages.showInputDialog(project, "Enter file name (e.g. report.csv):", "Export Report", null, "safegradle_report.csv", null)
                 if (path != null) {
