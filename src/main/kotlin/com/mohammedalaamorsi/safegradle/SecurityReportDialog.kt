@@ -1,5 +1,7 @@
 package com.mohammedalaamorsi.safegradle
 
+import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.openapi.fileEditor.OpenFileDescriptor
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.vfs.VirtualFile
@@ -9,6 +11,8 @@ import java.awt.BorderLayout
 import java.awt.Color
 import java.awt.Component
 import java.awt.Dimension
+import java.awt.event.MouseAdapter
+import java.awt.event.MouseEvent
 import javax.swing.JComponent
 import javax.swing.JLabel
 import javax.swing.JPanel
@@ -17,7 +21,7 @@ import javax.swing.table.DefaultTableModel
 import javax.swing.table.DefaultTableCellRenderer
 
 class SecurityReportDialog(
-    project: Project?,
+    private val project: Project?,
     private val violations: Map<VirtualFile, List<SecurityViolation>>
 ) : DialogWrapper(project) {
 
@@ -30,14 +34,18 @@ class SecurityReportDialog(
         val panel = JPanel(BorderLayout())
         
         val totalViolations = violations.values.sumOf { it.size }
-        val header = JLabel("Found $totalViolations potential security issues in ${violations.size} files.")
+        val header = JLabel("Found $totalViolations potential security issues in ${violations.size} files. Double-click a row to navigate.")
         panel.add(header, BorderLayout.NORTH)
 
         val columnNames = arrayOf("File", "Line", "Risk", "Message")
-        val model = DefaultTableModel(columnNames, 0)
+        val model = object : DefaultTableModel(columnNames, 0) {
+            override fun isCellEditable(row: Int, column: Int): Boolean = false
+        }
 
+        val flatViolations = mutableListOf<SecurityViolation>()
         violations.forEach { (file, list) ->
             list.forEach { violation ->
+                flatViolations.add(violation)
                 model.addRow(arrayOf<Any>(
                     file.name,
                     violation.line,
@@ -52,6 +60,21 @@ class SecurityReportDialog(
         table.columnModel.getColumn(1).preferredWidth = 50
         table.columnModel.getColumn(2).preferredWidth = 80
         table.columnModel.getColumn(3).preferredWidth = 400
+
+        // Navigation on double click
+        table.addMouseListener(object : MouseAdapter() {
+            override fun mouseClicked(e: MouseEvent) {
+                if (e.clickCount == 2 && project != null) {
+                    val row = table.selectedRow
+                    if (row >= 0 && row < flatViolations.size) {
+                        val violation = flatViolations[row]
+                        val descriptor = OpenFileDescriptor(project, violation.file, violation.line - 1, 0)
+                        FileEditorManager.getInstance(project).openTextEditor(descriptor, true)
+                        close(OK_EXIT_CODE)
+                    }
+                }
+            }
+        })
 
         // Custom renderer for Risk Level (Color coding)
         table.columnModel.getColumn(2).cellRenderer = object : DefaultTableCellRenderer() {

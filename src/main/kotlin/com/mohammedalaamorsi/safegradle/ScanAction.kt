@@ -4,10 +4,11 @@ import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
-import com.intellij.openapi.progress.ProgressManager
-import com.intellij.openapi.progress.Task
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.progress.ProgressIndicator
+import com.intellij.openapi.progress.ProgressManager
+import com.intellij.openapi.progress.Task
+import com.intellij.openapi.wm.ToolWindowManager
 
 class ScanAction : AnAction() {
     override fun actionPerformed(e: AnActionEvent) {
@@ -21,13 +22,16 @@ class ScanAction : AnAction() {
                 val violations = scanner.scanProject(project)
 
                 ApplicationManager.getApplication().invokeLater {
+                    SafeGradleResultService.getInstance(project).setResults(violations)
+                    
+                    val toolWindow = ToolWindowManager.getInstance(project).getToolWindow("SafeGradle")
+                    toolWindow?.show()
+                    
                     if (violations.isEmpty()) {
                         NotificationGroupManager.getInstance()
-                            .getNotificationGroup("Security Scan Results") // Make sure to define this in plugin.xml or use default
+                            .getNotificationGroup("Security Scan Results")
                             .createNotification("No security risks found in build scripts.", NotificationType.INFORMATION)
                             .notify(project)
-                    } else {
-                        SecurityReportDialog(project, violations).show()
                     }
                 }
             }

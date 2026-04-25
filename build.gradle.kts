@@ -26,6 +26,8 @@ repositories {
     // IntelliJ Platform Gradle Plugin Repositories Extension - read more: https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin-repositories-extension.html
     intellijPlatform {
         defaultRepositories()
+        snapshots()
+        nightly()
     }
 }
 
@@ -36,16 +38,16 @@ dependencies {
 
     // IntelliJ Platform Gradle Plugin Dependencies Extension - read more: https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin-dependencies-extension.html
     intellijPlatform {
-        intellijIdea(providers.gradleProperty("platformVersion"))
+        intellijIdeaCommunity(providers.gradleProperty("platformVersion"))
 
         // Plugin Dependencies. Uses `platformBundledPlugins` property from the gradle.properties file for bundled IntelliJ Platform plugins.
-        bundledPlugins(providers.gradleProperty("platformBundledPlugins").map { it.split(',') })
+        bundledPlugins(providers.gradleProperty("platformBundledPlugins").map { it.split(',').map { s -> s.trim() } })
 
         // Plugin Dependencies. Uses `platformPlugins` property from the gradle.properties file for plugin from JetBrains Marketplace.
-        plugins(providers.gradleProperty("platformPlugins").map { it.split(',') })
+        plugins(providers.gradleProperty("platformPlugins").map { it.split(',').map { s -> s.trim() } })
 
         // Module Dependencies. Uses `platformBundledModules` property from the gradle.properties file for bundled IntelliJ Platform modules.
-        bundledModules(providers.gradleProperty("platformBundledModules").map { it.split(',') })
+        bundledModules(providers.gradleProperty("platformBundledModules").map { it.split(',').map { s -> s.trim() } })
 
         testFramework(TestFrameworkType.Platform)
     }

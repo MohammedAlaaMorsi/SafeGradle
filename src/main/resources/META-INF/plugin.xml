@@ -5,12 +5,35 @@
     <vendor>SafeGradle</vendor>
 
     <depends>com.intellij.modules.platform</depends>
-
-
+    <depends>com.intellij.modules.java</depends>
+    <depends>org.jetbrains.kotlin</depends>
+    <depends optional="true" config-file="safegradle-gradle.xml">com.intellij.gradle</depends>
+    <depends optional="true" config-file="safegradle-groovy.xml">org.intellij.groovy</depends>
 
     <extensions defaultExtensionNs="com.intellij">
         <notificationGroup id="Security Scan Results" displayType="BALLOON"/>
         <editorNotificationProvider implementation="com.mohammedalaamorsi.safegradle.SafeGradleNotificationProvider"/>
+        <postStartupActivity implementation="com.mohammedalaamorsi.safegradle.SafeGradleProjectOpenListener"/>
+        <projectConfigurable
+                instance="com.mohammedalaamorsi.safegradle.SafeGradleConfigurable"
+                id="com.mohammedalaamorsi.safegradle.settings"
+                displayName="SafeGradle Security"/>
+        <toolWindow id="SafeGradle" anchor="bottom" factoryClass="com.mohammedalaamorsi.safegradle.SafeGradleToolWindowFactory" icon="AllIcons.Actions.Shield"/>
+        <externalAnnotator language="Groovy" implementationClass="com.mohammedalaamorsi.safegradle.SafeGradleAnnotator"/>
+        <externalAnnotator language="kotlin" implementationClass="com.mohammedalaamorsi.safegradle.SafeGradleAnnotator"/>
+        <externalAnnotator language="TEXT" implementationClass="com.mohammedalaamorsi.safegradle.SafeGradleAnnotator"/>
+        <intentionAction>
+            <className>com.mohammedalaamorsi.safegradle.SuppressViolationIntention</className>
+            <category>SafeGradle</category>
+        </intentionAction>
+        <intentionAction>
+            <className>com.mohammedalaamorsi.safegradle.WhitelistUrlIntention</className>
+            <category>SafeGradle</category>
+        </intentionAction>
+    </extensions>
+
+    <extensions defaultExtensionNs="org.jetbrains.kotlin">
+        <supportsKotlinPluginMode supportsK2="true" />
     </extensions>
 
     <applicationListeners>
@@ -18,7 +41,7 @@
     </applicationListeners>
 
     <actions>
-        <action id="com.mohammedalaamorsi.safegradle.scan" class="com.github.safegradle.security.ScanAction" text="Scan Build Scripts for Security Risks" description="Scans gradle files for malicious code">
+        <action id="com.mohammedalaamorsi.safegradle.scan" class="com.mohammedalaamorsi.safegradle.ScanAction" text="Scan Build Scripts for Security Risks" description="Scans gradle files for malicious code">
             <add-to-group group-id="ToolsMenu" anchor="last"/>
         </action>
         

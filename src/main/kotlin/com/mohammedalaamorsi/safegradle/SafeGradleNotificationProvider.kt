@@ -2,7 +2,6 @@ package com.mohammedalaamorsi.safegradle
 
 import com.intellij.ide.DataManager
 import com.intellij.ide.impl.isTrusted
-import com.intellij.ide.trustedProjects.TrustedProjects
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.ActionUiKind
 import com.intellij.openapi.actionSystem.AnActionEvent
@@ -22,7 +21,7 @@ class SafeGradleNotificationProvider : EditorNotificationProvider {
         file: VirtualFile
     ): Function<in FileEditor, out JComponent?>? {
         // Only show if the project is NOT trusted (Safe Mode)
-        if (TrustedProjects.isProjectTrusted(project)) {
+        if (project.isTrusted()) {
             return null
         }
         
@@ -34,8 +33,7 @@ class SafeGradleNotificationProvider : EditorNotificationProvider {
                 val action = ActionManager.getInstance().getAction("com.mohammedalaamorsi.safegradle.scan")
                 if (action != null) {
                     val context = DataManager.getInstance().getDataContext(panel)
-                    val event = AnActionEvent.createEvent(context, action.templatePresentation.clone(), "SafeModeBanner", ActionUiKind.NONE, null)
-                    ActionUtil.performAction(action, event)
+                    ActionUtil.invokeAction(action, context, "SafeModeBanner", null, null)
                 }
             }
             
