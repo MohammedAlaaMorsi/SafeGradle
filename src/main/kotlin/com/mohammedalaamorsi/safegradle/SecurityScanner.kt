@@ -2,10 +2,11 @@ package com.mohammedalaamorsi.safegradle
 
 import com.intellij.openapi.vfs.LocalFileSystem
 
-import com.intellij.openapi.application.runReadAction
+import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.guessProjectDir
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.psi.PsiFile
 import com.intellij.psi.PsiManager
 
 class SecurityScanner() {
@@ -56,7 +57,9 @@ class SecurityScanner() {
         val fileNames = listOf(
             "build.gradle", "build.gradle.kts",
             "settings.gradle", "settings.gradle.kts",
-            "gradle.properties", "gradle-wrapper.jar"
+            "gradle.properties", "gradle-wrapper.jar",
+            "gradle-wrapper.properties",
+            "libs.versions.toml"
         )
         
         val filesToScan = mutableListOf<VirtualFile>()
@@ -84,7 +87,7 @@ class SecurityScanner() {
                 
                 // Load PSI file for semantic analysis if needed
                 val psiFile = project?.let { proj ->
-                    runReadAction { PsiManager.getInstance(proj).findFile(file) }
+                    ReadAction.compute<PsiFile?, RuntimeException> { PsiManager.getInstance(proj).findFile(file) }
                 }
 
                 for (check in checks) {
@@ -93,7 +96,7 @@ class SecurityScanner() {
                     rawViolations.addAll(check.check(file, content, project, teamConfig))
                     
                     if (psiFile != null) {
-                        runReadAction {
+                        ReadAction.run<RuntimeException> {
                             rawViolations.addAll(check.checkPsi(psiFile, project, teamConfig))
                         }
                     }

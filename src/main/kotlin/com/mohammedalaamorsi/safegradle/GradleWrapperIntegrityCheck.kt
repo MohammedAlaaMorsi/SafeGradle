@@ -2,44 +2,65 @@ package com.mohammedalaamorsi.safegradle
 
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
-import java.security.MessageDigest
 
 class GradleWrapperIntegrityCheck : SecurityCheck {
     override val id = "gradle_wrapper_integrity"
     override val name = "Gradle Wrapper Integrity Check"
-    override val description = "Verifies that the gradle-wrapper.jar matches official checksums to prevent supply-chain attacks."
+    override val description = "Verifies that the Gradle wrapper configuration is secure and the distribution URL points to official Gradle servers."
 
-    // A small subset of known-good SHA-256 hashes for gradle-wrapper.jar
-    // In a production plugin, this would be fetched from https://services.gradle.org/distributions/
-    private val knownHashes = setOf(
-        "e0b608827f3f38012b6944e85741630138cd916248b1111d4e082877a565f12a", // 8.10
-        "f6b6107a66f0302c0b70a575a137255f0138a0f02008711142277a065f11a", // 8.9
-        "220970a27f29f0012b6944e85741630138cd916248b1111d4e082877a565f12a"  // Mock for testing
+    private val officialGradleDomains = setOf(
+        "services.gradle.org",
+        "downloads.gradle-dn.com",
+        "downloads.gradle.org"
     )
 
     override fun check(file: VirtualFile, content: String, project: Project?, teamConfig: YamlConfig?): List<SecurityViolation> {
-        if (file.name != "gradle-wrapper.jar") return emptyList()
+        if (file.name != "gradle-wrapper.properties") return emptyList()
 
-        return try {
-            val bytes = file.contentsToByteArray()
-            val digest = MessageDigest.getInstance("SHA-256")
-            val hash = digest.digest(bytes).joinToString("") { "%02x".format(it) }
+        val violations = mutableListOf<SecurityViolation>()
+        val lines = content.lines()
+        var hasChecksum = false
 
-            if (!knownHashes.contains(hash)) {
-                listOf(
-                    SecurityViolation(
-                        file = file,
-                        line = 1,
-                        content = "gradle-wrapper.jar",
-                        message = "Unverified Gradle Wrapper! Checksum $hash does not match known official Gradle distributions. This could be a supply-chain attack.",
-                        riskLevel = RiskLevel.HIGH
+        lines.forEachIndexed { index, line ->
+            val trimmed = line.trim()
+
+            if (trimmed.startsWith("distributionUrl=")) {
+                // Unescape backslash-colon used in .properties files (e.g. https\://...)
+                val url = trimmed.substringAfter("=").replace("\\:", ":")
+                val isOfficial = officialGradleDomains.any { domain -> url.contains(domain) }
+                if (!isOfficial) {
+                    violations.add(
+                        SecurityViolation(
+                            file = file,
+                            line = index + 1,
+                            content = trimmed,
+                            message = "Gradle distribution URL does not point to an official Gradle server. " +
+                                    "Expected one of: ${officialGradleDomains.joinToString()}. " +
+                                    "This may indicate a supply-chain attack.",
+                            riskLevel = RiskLevel.HIGH
+                        )
                     )
-                )
-            } else {
-                emptyList()
+                }
             }
-        } catch (e: Exception) {
-            emptyList()
+
+            if (trimmed.startsWith("distributionSha256Sum=") && trimmed.substringAfter("=").isNotBlank()) {
+                hasChecksum = true
+            }
         }
+
+        if (!hasChecksum) {
+            violations.add(
+                SecurityViolation(
+                    file = file,
+                    line = 1,
+                    content = file.name,
+                    message = "Gradle wrapper is missing 'distributionSha256Sum'. " +
+                            "Add this property to cryptographically verify the downloaded Gradle distribution.",
+                    riskLevel = RiskLevel.LOW
+                )
+            )
+        }
+
+        return violations
     }
 }

@@ -149,7 +149,8 @@ class TrustDialogInjector : AppLifecycleListener {
                         window.dispose()
                         val action = OpenSafeProjectAction()
                         val context = DataManager.getInstance().getDataContext(window)
-                        ActionUtil.invokeAction(action, context, "TrustDialogInjector", null, null)
+                        val event = AnActionEvent.createEvent(action, context, null, "TrustDialogInjector", ActionUiKind.NONE, null)
+                        ActionUtil.performActionDumbAwareWithCallbacks(action, event)
                     }
 
                     buttonsPanel.add(safeButton, 0)
