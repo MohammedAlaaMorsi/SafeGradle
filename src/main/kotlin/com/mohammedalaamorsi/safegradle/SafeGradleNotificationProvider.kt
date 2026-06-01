@@ -21,19 +21,21 @@ class SafeGradleNotificationProvider : EditorNotificationProvider {
         file: VirtualFile
     ): Function<in FileEditor, out JComponent?>? {
         // Only show if the project is NOT trusted (Safe Mode)
+        @Suppress("UnstableApiUsage")
         if (project.isTrusted()) {
             return null
         }
         
         return Function { fileEditor: FileEditor ->
             val panel = EditorNotificationPanel(fileEditor, EditorNotificationPanel.Status.Warning)
-            panel.text = "This project is in Safe Mode. Scan files with SafeGradle to detect potential security risks before trusting."
+            panel.text = "This project is in Safe Mode. Scan files with SafeGradle to detect potential security risks before trusting it."
             
             panel.createActionLabel("Scan with SafeGradle") {
                 val action = ActionManager.getInstance().getAction("com.mohammedalaamorsi.safegradle.scan")
                 if (action != null) {
                     val context = DataManager.getInstance().getDataContext(panel)
-                    ActionUtil.invokeAction(action, context, "SafeModeBanner", null, null)
+                    val event = AnActionEvent.createEvent(action, context, null, "SafeModeBanner", ActionUiKind.NONE, null)
+                    ActionUtil.performActionDumbAwareWithCallbacks(action, event)
                 }
             }
             

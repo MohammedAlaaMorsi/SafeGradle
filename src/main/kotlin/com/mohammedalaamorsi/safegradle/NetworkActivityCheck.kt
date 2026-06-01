@@ -19,7 +19,7 @@ class NetworkActivityCheck : SecurityCheck {
         Pattern.compile("OkHttpClient", Pattern.CASE_INSENSITIVE),
         Pattern.compile("InetAddress", Pattern.CASE_INSENSITIVE),
         Pattern.compile("Socket\\(", Pattern.CASE_INSENSITIVE),
-        // Simple regex for IP addresses (excluding localhost 127.0.0.1)
+        // URL pattern (excluding localhost / 127.0.0.1)
         Pattern.compile("(http|https)://(?!localhost|127\\.0\\.0\\.1)[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}", Pattern.CASE_INSENSITIVE)
     )
 
@@ -108,8 +108,8 @@ class NetworkActivityCheck : SecurityCheck {
                                 file = psiFile.virtualFile,
                                 line = lineNumber,
                                 content = text,
-                                message = "Semantic detection: Suspicious URL in string literal: $url",
-                                riskLevel = RiskLevel.HIGH
+                                message = "Non-whitelisted URL in string literal: $url. Verify this domain is intentional.",
+                                riskLevel = RiskLevel.MEDIUM
                             )
                         )
                     }

@@ -22,7 +22,7 @@ class OpenSafeReportDialog(
         val panel = JPanel(BorderLayout(10, 10))
         panel.preferredSize = Dimension(600, 400)
 
-        val warningLabel = JLabel("<html><b>Warning:</b> Potential security risks were found in the build scripts of the project you are about to open.<br>Automatically running Gradle sync may compromise your system. Proceed with caution.</html>")
+        val warningLabel = JLabel("<html><b>Warning:</b> Potential security risks were found in the build scripts of this project.<br>Allowing Gradle to sync automatically may execute malicious code. Proceed with caution.</html>")
         warningLabel.icon = UIManager.getIcon("OptionPane.warningIcon")
         panel.add(warningLabel, BorderLayout.NORTH)
 
