@@ -11,5 +11,6 @@ data class SecurityViolation(
     val line: Int,
     val content: String,
     val message: String,
-    val riskLevel: RiskLevel
+    val riskLevel: RiskLevel,
+    val checkId: String = "unknown"
 )

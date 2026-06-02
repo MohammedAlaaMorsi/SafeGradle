@@ -1,0 +1,89 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SafeGradle Configuration",
+  "description": "Team-wide SafeGradle security policy for .safegradle.yml",
+  "type": "object",
+  "properties": {
+    "whitelist_domains": {
+      "description": "Domains that SafeGradle will never flag, regardless of how they appear in build files.",
+      "type": "array",
+      "items": { "type": "string", "examples": ["mycompany.com", "maven.mycompany.com"] }
+    },
+    "severity_overrides": {
+      "description": "Override the risk level of a specific check, or mute it entirely with 'none'.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "enum": ["HIGH", "MEDIUM", "LOW", "none", "mute", "off", "disabled"]
+      },
+      "examples": [
+        { "plugin_injection": "none", "shell_execution": "HIGH" }
+      ],
+      "propertyNames": {
+        "enum": [
+          "shell_execution",
+          "network_activity",
+          "sensitive_file_access",
+          "obfuscated_code",
+          "system_tampering",
+          "credential_leak",
+          "file_exfiltration",
+          "gradle_wrapper_integrity",
+          "dependency_confusion",
+          "plugin_injection",
+          "dependency_vulnerability",
+          "gitignore_exposure"
+        ]
+      }
+    },
+    "suppressions": {
+      "description": "Suppress specific violations by file, check ID, and optionally line number.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["check", "file"],
+        "properties": {
+          "check": {
+            "description": "The check ID to suppress. Use 'all' to suppress every check for the given file.",
+            "type": "string",
+            "enum": [
+              "all",
+              "shell_execution",
+              "network_activity",
+              "sensitive_file_access",
+              "obfuscated_code",
+              "system_tampering",
+              "credential_leak",
+              "file_exfiltration",
+              "gradle_wrapper_integrity",
+              "dependency_confusion",
+              "plugin_injection",
+              "dependency_vulnerability",
+              "gitignore_exposure",
+              "apply_from_remote"
+            ]
+          },
+          "file": {
+            "description": "Path suffix of the file to suppress (e.g. 'build.gradle' or 'scripts/signing.gradle').",
+            "type": "string"
+          },
+          "line": {
+            "description": "Optional line number. If omitted, all violations from this check in the file are suppressed.",
+            "type": "integer",
+            "minimum": 1
+          },
+          "reason": {
+            "description": "Human-readable justification for the suppression (recommended for audit trails).",
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "allowed_script_sources": {
+    "description": "URL prefixes permitted in 'apply from:' statements. Any remote URL not matching a prefix is flagged HIGH.",
+    "type": "array",
+    "items": { "type": "string", "examples": ["https://raw.githubusercontent.com/myorg/"] }
+  },
+  "additionalProperties": false
+}

@@ -23,6 +23,29 @@ class NetworkActivityCheck : SecurityCheck {
         Pattern.compile("(http|https)://(?!localhost|127\\.0\\.0\\.1)[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}", Pattern.CASE_INSENSITIVE)
     )
 
+    // Detects plain http:// (not https://) inside repository/maven/url blocks — MITM risk
+    private val httpRepoPattern = Pattern.compile("http://(?!localhost|127\\.0\\.0\\.1)[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}", Pattern.CASE_INSENSITIVE)
+
+    // Detects IP-address URLs — bypasses domain-based whitelisting entirely
+    private val ipUrlPattern = Pattern.compile(
+        """https?://(\d{1,3}\.){3}\d{1,3}(:\d+)?(/[^\s'"]*)?""",
+        Pattern.CASE_INSENSITIVE
+    )
+    // Private / link-local IP ranges that are clearly non-public (safe to skip)
+    private val privateIpPattern = Pattern.compile(
+        """https?://(10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+|192\.168\.\d+\.\d+|127\.\d+\.\d+\.\d+|169\.254\.\d+\.\d+)""",
+        Pattern.CASE_INSENSITIVE
+    )
+
+    // Crypto mining pool indicators and DNS-based C2 exfiltration patterns
+    private val miningPatterns = listOf(
+        Pattern.compile("stratum\\+tcp://", Pattern.CASE_INSENSITIVE),
+        Pattern.compile("pool\\.minergate\\.com|xmrpool\\.eu|nanopool\\.org|f2pool\\.com|antpool\\.com|nicehash\\.com|miningpoolhub\\.com", Pattern.CASE_INSENSITIVE),
+        Pattern.compile("\\bmonero\\b.*\\bwallet\\b|\\bxmr\\b.*\\bmine\\b|\\bmine.*\\bprofit\\b", Pattern.CASE_INSENSITIVE),
+        // DNS-based C2 / OOB detection services used in exploit PoCs
+        Pattern.compile("\\.dnslog\\.cn|\\.ceye\\.io|\\.requestbin\\.com|\\.interactsh\\.com|\\.burpcollaborator\\.net", Pattern.CASE_INSENSITIVE)
+    )
+
     override fun check(file: VirtualFile, content: String, project: Project?, teamConfig: YamlConfig?): List<SecurityViolation> {
         val violations = mutableListOf<SecurityViolation>()
         val lines = content.lines()
@@ -51,22 +74,36 @@ class NetworkActivityCheck : SecurityCheck {
                 }
             }
 
+            // JCenter was shut down on 2022-02-01 — flag its use as a warning
+            if (strippedLine.startsWith("jcenter()")) {
+                violations.add(
+                    SecurityViolation(
+                        file = file,
+                        line = index + 1,
+                        content = strippedLine,
+                        message = "JCenter (jcenter.bintray.com) was shut down in February 2022. Remove jcenter() and migrate to Maven Central or another active repository.",
+                        riskLevel = RiskLevel.LOW
+                    )
+                )
+                return@forEachIndexed
+            }
+
             // Skip legitimate dependency declarations and plugin repositories or safe blocks
             if (currentInsideSafeBlock ||
-                strippedLine.startsWith("maven") || 
-                strippedLine.startsWith("google()") || 
-                strippedLine.startsWith("jcenter()") ||
+                strippedLine.startsWith("maven") ||
+                strippedLine.startsWith("google()") ||
                 strippedLine.startsWith("classpath") ||
                 strippedLine.startsWith("implementation") ||
                 strippedLine.startsWith("api")) {
                 return@forEachIndexed
             }
 
+            val uncommented = SecurityUtils.stripComments(line)
             for (pattern in patterns) {
-                val matcher = pattern.matcher(line)
+                val matcher = pattern.matcher(uncommented)
                 while (matcher.find()) {
                     val match = matcher.group()
-                    
+
                     // Check if the match is a URL and if it's whitelisted
                     if (match.startsWith("http", ignoreCase = true) && WhitelistConfig.isWhitelistedUrl(match, project, teamConfig)) {
                         continue
@@ -79,6 +116,56 @@ class NetworkActivityCheck : SecurityCheck {
                             content = line.trim(),
                             message = "Suspicious network activity detected: $match",
                             riskLevel = RiskLevel.MEDIUM
+                        )
+                    )
+                }
+            }
+
+            // Crypto mining pool and DNS C2 detection (always HIGH — no legitimate use in build scripts)
+            for (miningPattern in miningPatterns) {
+                val m = miningPattern.matcher(uncommented)
+                if (m.find()) {
+                    violations.add(
+                        SecurityViolation(
+                            file = file,
+                            line = index + 1,
+                            content = line.trim(),
+                            message = "Crypto-mining or command-and-control indicator detected: '${m.group().take(60)}'. This pattern has no legitimate use in a build script.",
+                            riskLevel = RiskLevel.HIGH
+                        )
+                    )
+                }
+            }
+
+            // Flag public IP-based URLs — they bypass all domain whitelisting
+            val ipMatcher = ipUrlPattern.matcher(uncommented)
+            while (ipMatcher.find()) {
+                val url = ipMatcher.group()
+                if (!privateIpPattern.matcher(url).find()) {
+                    violations.add(
+                        SecurityViolation(
+                            file = file,
+                            line = index + 1,
+                            content = line.trim(),
+                            message = "IP-address URL '$url' bypasses domain-based whitelisting. Use a hostname instead, or explicitly whitelist this endpoint in .safegradle.yml.",
+                            riskLevel = RiskLevel.HIGH
+                        )
+                    )
+                }
+            }
+
+            // Flag plain http:// (non-HTTPS) URLs anywhere in the file — susceptible to MITM attacks
+            val httpMatcher = httpRepoPattern.matcher(uncommented)
+            while (httpMatcher.find()) {
+                val url = httpMatcher.group()
+                if (!WhitelistConfig.isWhitelistedUrl(url, project, teamConfig)) {
+                    violations.add(
+                        SecurityViolation(
+                            file = file,
+                            line = index + 1,
+                            content = line.trim(),
+                            message = "Insecure HTTP URL '$url' — use HTTPS to prevent man-in-the-middle attacks on dependency downloads.",
+                            riskLevel = RiskLevel.HIGH
                         )
                     )
                 }

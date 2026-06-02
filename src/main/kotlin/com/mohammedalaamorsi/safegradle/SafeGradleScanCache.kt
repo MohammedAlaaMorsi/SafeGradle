@@ -47,6 +47,10 @@ class SafeGradleScanCache : PersistentStateComponent<SafeGradleScanCache.State> 
         }
     }
 
+    fun invalidate(file: VirtualFile) {
+        myState.cacheEntries.remove(file.path)
+    }
+
     fun updateCache(file: VirtualFile, violations: List<SecurityViolation>) {
         val entry = CacheEntry(
             hash = file.modificationCount.toString(),

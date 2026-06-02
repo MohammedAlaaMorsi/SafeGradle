@@ -18,7 +18,8 @@ class ScanAction : AnAction() {
             override fun run(indicator: ProgressIndicator) {
                 indicator.text = "Scanning build scripts..."
                 
-                val scanner = SecurityScanner()
+                val customChecks = CustomCheckLoader.loadChecks(project)
+                val scanner = SecurityScanner(customChecks)
                 val violations = scanner.scanProject(project)
 
                 ApplicationManager.getApplication().invokeLater {

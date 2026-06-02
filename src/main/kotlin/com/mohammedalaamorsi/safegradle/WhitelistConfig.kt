@@ -5,30 +5,53 @@ import com.intellij.openapi.project.Project
 object WhitelistConfig {
     // Built-in safe domains (never flagged)
     private val builtInWhitelist = setOf(
+        // Gradle official
         "gradle.org",
         "plugins.gradle.org",
         "services.gradle.org",
+        "downloads.gradle.org",
+        "downloads.gradle-dn.com",
+        "artifacts.gradle.org",
+        // Maven Central / Sonatype
         "repo.maven.apache.org",
         "repo1.maven.org",
         "central.sonatype.com",
-        "jcenter.bintray.com",
-        "dl.google.com",
-        "maven.google.com",
-        "kotlin.bintray.com",
-        "plugins.jetbrains.com",
-        "packages.jetbrains.team",
-        "maven.pkg.github.com",
-        "registry.npmjs.org",
-        "jitpack.io",
         "oss.sonatype.org",
         "s01.oss.sonatype.org",
-        "repository.apache.org",
-        "clojars.org",
-        "repo.spring.io",
-        "maven.fabric.io",
-        "maven.atlassian.com",
+        "repository.sonatype.org",
+        // Google / Android
+        "dl.google.com",
+        "maven.google.com",
+        "storage.googleapis.com",
+        // JetBrains / Kotlin
+        "plugins.jetbrains.com",
+        "packages.jetbrains.team",
+        "cache-redirector.jetbrains.com",
+        // GitHub
+        "maven.pkg.github.com",
         "raw.githubusercontent.com",
-        "github.com"
+        "github.com",
+        // Apache
+        "repository.apache.org",
+        "repo.maven.apache.org",
+        // Spring
+        "repo.spring.io",
+        // Community / misc registries
+        "jitpack.io",
+        "clojars.org",
+        "packages.microsoft.com",
+        "nuget.pkg.github.com",
+        // Common CDNs used by build tools
+        "cloudfront.net",
+        "azureedge.net",
+        // Firebase / Fabric
+        "maven.fabric.io",
+        "dl.firebase.io",
+        // Atlassian
+        "maven.atlassian.com",
+        "packages.atlassian.com",
+        // npm (sometimes referenced in multi-platform builds)
+        "registry.npmjs.org"
     )
 
     fun isWhitelistedUrl(url: String, project: Project? = null, teamConfig: YamlConfig? = null): Boolean {

@@ -114,7 +114,7 @@ class PluginInjectionCheck : SecurityCheck {
                             line = index + 1,
                             content = stripped,
                             message = "Unknown plugin '$pluginId'. Verify it comes from a trusted source before enabling it.",
-                            riskLevel = RiskLevel.MEDIUM
+                            riskLevel = RiskLevel.LOW
                         )
                     )
                 }
@@ -130,7 +130,7 @@ class PluginInjectionCheck : SecurityCheck {
                             line = index + 1,
                             content = stripped,
                             message = "Unknown plugin applied via legacy syntax: '$pluginId'. Verify it comes from a trusted source.",
-                            riskLevel = RiskLevel.MEDIUM
+                            riskLevel = RiskLevel.LOW
                         )
                     )
                 }
