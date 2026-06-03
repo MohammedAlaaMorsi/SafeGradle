@@ -10,7 +10,8 @@ class SafeGradleSettings : PersistentStateComponent<SafeGradleSettings.State> {
     data class State(
         var whitelistedDomains: MutableList<String> = mutableListOf(),
         var ignoredViolations: MutableList<IgnoredViolation> = mutableListOf(),
-        var enabledChecks: MutableMap<String, Boolean> = mutableMapOf()
+        var enabledChecks: MutableMap<String, Boolean> = mutableMapOf(),
+        var enableOsvLookup: Boolean = true
     )
 
     data class IgnoredViolation(

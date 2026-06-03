@@ -6,6 +6,7 @@ import com.intellij.ide.RecentProjectsManager
 import com.intellij.openapi.actionSystem.ActionUiKind
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.ex.ActionUtil
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.progress.Task
@@ -27,7 +28,6 @@ import javax.swing.JButton
 import javax.swing.JDialog
 import javax.swing.JFrame
 import javax.swing.JPanel
-import javax.swing.SwingUtilities
 import javax.swing.Timer
 
 class TrustDialogInjector : AppLifecycleListener {
@@ -124,7 +124,7 @@ class TrustDialogInjector : AppLifecycleListener {
                                             val scanner = SecurityScanner()
                                             val violations = scanner.scanDirectory(vFile)
                                             
-                                            SwingUtilities.invokeLater {
+                                            ApplicationManager.getApplication().invokeLater {
                                                 if (violations.isEmpty()) {
                                                     trustButton?.doClick() ?: window.dispose()
                                                 } else {

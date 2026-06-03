@@ -9,16 +9,37 @@
     <depends>org.jetbrains.kotlin</depends>
     <depends optional="true" config-file="safegradle-gradle.xml">com.intellij.gradle</depends>
     <depends optional="true" config-file="safegradle-groovy.xml">org.intellij.groovy</depends>
+    <depends optional="true" config-file="safegradle-json-schema.xml">com.intellij.modules.json</depends>
 
     <extensions defaultExtensionNs="com.intellij">
+        <projectService serviceImplementation="com.mohammedalaamorsi.safegradle.SafeGradleScanHistory"/>
         <notificationGroup id="Security Scan Results" displayType="BALLOON"/>
         <editorNotificationProvider implementation="com.mohammedalaamorsi.safegradle.SafeGradleNotificationProvider"/>
+        <localInspection language="Groovy"
+                         implementationClass="com.mohammedalaamorsi.safegradle.SafeGradleInspection"
+                         displayName="SafeGradle Security Check"
+                         groupName="SafeGradle"
+                         enabledByDefault="true"
+                         level="WARNING"/>
+        <localInspection language="kotlin"
+                         implementationClass="com.mohammedalaamorsi.safegradle.SafeGradleInspection"
+                         displayName="SafeGradle Security Check"
+                         groupName="SafeGradle"
+                         enabledByDefault="true"
+                         level="WARNING"/>
+        <localInspection language="TEXT"
+                         implementationClass="com.mohammedalaamorsi.safegradle.SafeGradleInspection"
+                         displayName="SafeGradle Security Check"
+                         groupName="SafeGradle"
+                         enabledByDefault="true"
+                         level="WARNING"/>
         <postStartupActivity implementation="com.mohammedalaamorsi.safegradle.SafeGradleProjectOpenListener"/>
         <projectConfigurable
                 instance="com.mohammedalaamorsi.safegradle.SafeGradleConfigurable"
                 id="com.mohammedalaamorsi.safegradle.settings"
                 displayName="SafeGradle Security"/>
         <toolWindow id="SafeGradle" anchor="bottom" factoryClass="com.mohammedalaamorsi.safegradle.SafeGradleToolWindowFactory" icon="AllIcons.Actions.Shield"/>
+        <statusBarWidgetFactory implementation="com.mohammedalaamorsi.safegradle.SafeGradleStatusBarWidgetFactory" id="SafeGradleStatusWidget" order="last"/>
         <externalAnnotator language="Groovy" implementationClass="com.mohammedalaamorsi.safegradle.SafeGradleAnnotator"/>
         <externalAnnotator language="kotlin" implementationClass="com.mohammedalaamorsi.safegradle.SafeGradleAnnotator"/>
         <externalAnnotator language="TEXT" implementationClass="com.mohammedalaamorsi.safegradle.SafeGradleAnnotator"/>
@@ -28,6 +49,14 @@
         </intentionAction>
         <intentionAction>
             <className>com.mohammedalaamorsi.safegradle.WhitelistUrlIntention</className>
+            <category>SafeGradle</category>
+        </intentionAction>
+        <intentionAction>
+            <className>com.mohammedalaamorsi.safegradle.FixHttpToHttpsIntention</className>
+            <category>SafeGradle</category>
+        </intentionAction>
+        <intentionAction>
+            <className>com.mohammedalaamorsi.safegradle.PinDynamicVersionIntention</className>
             <category>SafeGradle</category>
         </intentionAction>
     </extensions>
@@ -48,6 +77,9 @@
         <action id="com.github.safegradle.openSafe" class="com.mohammedalaamorsi.safegradle.OpenSafeProjectAction" text="Open in SafeGradle" icon="AllIcons.Actions.Shield" description="Select a project folder and scan for malicious code before opening">
             <add-to-group group-id="WelcomeScreen.QuickStart" anchor="first"/>
             <add-to-group group-id="MainMenu" anchor="last"/>
+        </action>
+        <action id="com.mohammedalaamorsi.safegradle.generateCi" class="com.mohammedalaamorsi.safegradle.GenerateCiConfigAction" text="Generate SafeGradle CI Workflow" description="Creates .github/workflows/safegradle.yml for GitHub Actions CI integration">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
         </action>
     </actions>
 </idea-plugin>

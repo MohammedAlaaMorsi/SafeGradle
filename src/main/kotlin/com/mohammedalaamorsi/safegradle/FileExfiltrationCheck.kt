@@ -18,15 +18,16 @@ class FileExfiltrationCheck : SecurityCheck {
         Pattern.compile("ZipOutputStream", Pattern.CASE_INSENSITIVE)
     )
 
+    // Writing to .git/hooks/ installs a persistent hook that survives the build
+    private val gitHookPattern = Pattern.compile("""\Q.git/hooks/\E|\.git[/\\]hooks[/\\]""", Pattern.CASE_INSENSITIVE)
+
     override fun check(file: VirtualFile, content: String, project: Project?, teamConfig: YamlConfig?): List<SecurityViolation> {
         val violations = mutableListOf<SecurityViolation>()
         val lines = content.lines()
 
         lines.forEachIndexed { index, line ->
-            // Skip comments
-            if (line.trim().startsWith("//")) {
-                return@forEachIndexed
-            }
+            val stripped = line.trim()
+            if (stripped.startsWith("//") || stripped.startsWith("#")) return@forEachIndexed
 
             for (pattern in patterns) {
                 val matcher = pattern.matcher(line)
@@ -35,12 +36,25 @@ class FileExfiltrationCheck : SecurityCheck {
                         SecurityViolation(
                             file = file,
                             line = index + 1,
-                            content = line.trim(),
+                            content = stripped,
                             message = "Potential file exfiltration or data writing detected: ${matcher.group()}",
                             riskLevel = RiskLevel.MEDIUM
                         )
                     )
                 }
+            }
+
+            // Git hook tampering — writing to .git/hooks/ creates persistent code that runs on every commit
+            if (gitHookPattern.matcher(line).find()) {
+                violations.add(
+                    SecurityViolation(
+                        file = file,
+                        line = index + 1,
+                        content = stripped,
+                        message = "Possible git hook tampering: reference to '.git/hooks/' detected. Writing to this directory installs persistent code that executes on every git operation.",
+                        riskLevel = RiskLevel.HIGH
+                    )
+                )
             }
         }
         return violations

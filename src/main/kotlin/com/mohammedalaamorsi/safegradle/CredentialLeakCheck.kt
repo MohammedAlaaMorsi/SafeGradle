@@ -15,6 +15,13 @@ class CredentialLeakCheck : SecurityCheck {
         Pattern.compile("(password|passwd|secret|token)\\s*[=:]\\s*[\"']([^\"']+)[\"']", Pattern.CASE_INSENSITIVE)
     )
 
+    // Gradle Enterprise / Develocity access keys — grant access to build scan data and remote cache
+    private val gradleEnterprisePatterns = listOf(
+        Pattern.compile("gradle\\.enterprise\\.accessKey\\s*=\\s*(\\S+)", Pattern.CASE_INSENSITIVE),
+        Pattern.compile("develocity\\.accessKey\\s*=\\s*(\\S+)", Pattern.CASE_INSENSITIVE),
+        Pattern.compile("ge\\.accessKey\\s*=\\s*(\\S+)", Pattern.CASE_INSENSITIVE)
+    )
+
     // High-confidence patterns with recognisable prefixes — no placeholder filtering needed
     private val specificPatterns = listOf(
         Pattern.compile("(AKIA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA|ASIA)[0-9A-Z]{16}"),  // AWS key ID
@@ -68,6 +75,25 @@ class CredentialLeakCheck : SecurityCheck {
                             riskLevel = RiskLevel.HIGH
                         )
                     )
+                }
+            }
+
+            // Gradle Enterprise / Develocity access key
+            for (pattern in gradleEnterprisePatterns) {
+                val matcher = pattern.matcher(line)
+                if (matcher.find()) {
+                    val value = if (matcher.groupCount() >= 1) matcher.group(1) else ""
+                    if (value.isNotBlank() && !isPlaceholder(value)) {
+                        violations.add(
+                            SecurityViolation(
+                                file = file,
+                                line = index + 1,
+                                content = line.trim(),
+                                message = "Gradle Enterprise / Develocity access key detected. This grants access to build scan data and the remote build cache — store it in an environment variable instead.",
+                                riskLevel = RiskLevel.HIGH
+                            )
+                        )
+                    }
                 }
             }
 

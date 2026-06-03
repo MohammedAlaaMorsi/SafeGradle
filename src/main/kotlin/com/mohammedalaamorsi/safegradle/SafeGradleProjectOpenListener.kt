@@ -3,13 +3,19 @@ package com.mohammedalaamorsi.safegradle
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.startup.ProjectActivity
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.openapi.wm.ToolWindowManager
 
 class SafeGradleProjectOpenListener : ProjectActivity {
     override suspend fun execute(project: Project) {
+        // Register file watcher for scan-on-save
+        project.messageBus.connect()
+            .subscribe(VirtualFileManager.VFS_CHANGES, SafeGradleFileWatcher(project))
+
         // Run a lightweight scan in the background
         ApplicationManager.getApplication().executeOnPooledThread {
-            val scanner = SecurityScanner()
+            val customChecks = CustomCheckLoader.loadChecks(project)
+            val scanner = SecurityScanner(customChecks)
             val violations = scanner.scanProject(project)
             
             ApplicationManager.getApplication().invokeLater {

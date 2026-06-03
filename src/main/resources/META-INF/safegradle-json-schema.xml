@@ -1,0 +1,6 @@
+<idea-plugin>
+    <!-- JSON Schema provider for .safegradle.yml autocomplete.
+         Requires the com.intellij.modules.json plugin to be present at runtime.
+         The schema file is at /schemas/safegradle-config.schema.json and can be
+         manually mapped in Settings → Languages & Frameworks → Schemas and DTDs. -->
+</idea-plugin>
