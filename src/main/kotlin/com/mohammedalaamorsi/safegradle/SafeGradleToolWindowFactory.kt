@@ -243,29 +243,36 @@ class SafeGradleToolWindowFactory : ToolWindowFactory, DumbAware {
 
         private fun applyFilter() {
             val baseline = if (newOnlyToggle.isSelected) SafeGradleBaseline.load(project) else emptySet()
-            val text = searchField.text.trim()
-
-            val noneSelected = !showHighToggle.isSelected && !showMediumToggle.isSelected && !showLowToggle.isSelected
-            val allowedLevels = mutableSetOf<String>()
-            if (noneSelected || showHighToggle.isSelected) allowedLevels.add("HIGH")
-            if (noneSelected || showMediumToggle.isSelected) allowedLevels.add("MEDIUM")
-            if (noneSelected || showLowToggle.isSelected) allowedLevels.add("LOW")
+            val text = searchField.text.trim().lowercase()
+            val highOn = showHighToggle.isSelected
+            val medOn  = showMediumToggle.isSelected
+            val lowOn  = showLowToggle.isSelected
+            val anyOn  = highOn || medOn || lowOn
 
             rowSorter.rowFilter = object : RowFilter<DefaultTableModel, Int>() {
                 override fun include(entry: Entry<out DefaultTableModel, out Int>): Boolean {
-                    val modelRow = entry.identifier
-                    val violation = flatViolations.getOrNull(modelRow) ?: return false
+                    // Risk-level filter: read directly from column 2 (the RiskLevel object),
+                    // so this never depends on flatViolations ordering.
+                    if (anyOn) {
+                        val risk = entry.getValue(2) as? RiskLevel
+                        val pass = (highOn && risk == RiskLevel.HIGH) ||
+                                   (medOn  && risk == RiskLevel.MEDIUM) ||
+                                   (lowOn  && risk == RiskLevel.LOW)
+                        if (!pass) return false
+                    }
 
                     // Baseline filter
-                    if (baseline.isNotEmpty() && !SafeGradleBaseline.isNew(violation, baseline)) return false
+                    if (baseline.isNotEmpty()) {
+                        val violation = flatViolations.getOrNull(entry.identifier) ?: return false
+                        if (!SafeGradleBaseline.isNew(violation, baseline)) return false
+                    }
 
-                    // Risk level filter
-                    if (violation.riskLevel.name !in allowedLevels) return false
-
-                    // Text search filter
+                    // Text search
                     if (text.isNotEmpty()) {
-                        val haystack = "${violation.file.name} ${violation.message} ${violation.riskLevel}".lowercase()
-                        if (!haystack.contains(text.lowercase())) return false
+                        val row = (0 until entry.valueCount)
+                            .joinToString(" ") { entry.getStringValue(it) }
+                            .lowercase()
+                        if (!row.contains(text)) return false
                     }
 
                     return true
