@@ -1,18 +1,24 @@
 package com.mohammedalaamorsi.safegradle
 
 object SecurityUtils {
-    /**
-     * Strips single-line comments from a line.
-     * Note: This is a simple implementation and doesn't handle strings containing // correctly.
-     * In a full implementation, we'd use a lexer or more complex regex.
-     */
     fun stripComments(line: String): String {
-        val commentIndex = line.indexOf("//")
-        return if (commentIndex >= 0) {
-            line.substring(0, commentIndex)
-        } else {
-            line
+        var inString = false
+        var stringChar = ' '
+        var i = 0
+        while (i < line.length) {
+            val c = line[i]
+            if (inString) {
+                if (c == '\\') { i += 2; continue }
+                if (c == stringChar) inString = false
+            } else {
+                if (c == '"' || c == '\'') { inString = true; stringChar = c }
+                else if (c == '/' && i + 1 < line.length && line[i + 1] == '/') {
+                    return line.substring(0, i)
+                }
+            }
+            i++
         }
+        return line
     }
 
     /**

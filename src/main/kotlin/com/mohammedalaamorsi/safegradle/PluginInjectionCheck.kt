@@ -88,7 +88,7 @@ class PluginInjectionCheck : SecurityCheck {
     )
 
     private val pluginPattern = Pattern.compile(
-        "(id|plugin)\\s*[\\(\"']\\s*([^\"'\\)]+)\\s*[\\)\"']",
+        "(id|plugin)\\s*\\(?[\"']\\s*([^\"'\\)]+)\\s*[\"']\\)?",
         Pattern.CASE_INSENSITIVE
     )
     private val applyPattern = Pattern.compile(

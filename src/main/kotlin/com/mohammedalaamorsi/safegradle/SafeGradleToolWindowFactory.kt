@@ -59,9 +59,9 @@ class SafeGradleToolWindowFactory : ToolWindowFactory, DumbAware {
 
         // Filter controls
         private val searchField = JTextField(20)
-        private val showHighToggle = JToggleButton("🔴 HIGH", true)
-        private val showMediumToggle = JToggleButton("🟠 MED", true)
-        private val showLowToggle = JToggleButton("🔵 LOW", true)
+        private val showHighToggle = JToggleButton("🔴 HIGH", false)
+        private val showMediumToggle = JToggleButton("🟠 MED", false)
+        private val showLowToggle = JToggleButton("🔵 LOW", false)
 
         init {
             project.messageBus.connect().subscribe(SafeGradleResultService.TOPIC, this)
@@ -176,7 +176,7 @@ class SafeGradleToolWindowFactory : ToolWindowFactory, DumbAware {
                         foreground = when (value) {
                             RiskLevel.HIGH -> Color.RED
                             RiskLevel.MEDIUM -> Color.ORANGE
-                            RiskLevel.LOW -> Color.BLUE
+                            RiskLevel.LOW -> Color(130, 130, 130)
                         }
                     }
                     return c
@@ -245,10 +245,11 @@ class SafeGradleToolWindowFactory : ToolWindowFactory, DumbAware {
             val baseline = if (newOnlyToggle.isSelected) SafeGradleBaseline.load(project) else emptySet()
             val text = searchField.text.trim()
 
+            val noneSelected = !showHighToggle.isSelected && !showMediumToggle.isSelected && !showLowToggle.isSelected
             val allowedLevels = mutableSetOf<String>()
-            if (showHighToggle.isSelected) allowedLevels.add("HIGH")
-            if (showMediumToggle.isSelected) allowedLevels.add("MEDIUM")
-            if (showLowToggle.isSelected) allowedLevels.add("LOW")
+            if (noneSelected || showHighToggle.isSelected) allowedLevels.add("HIGH")
+            if (noneSelected || showMediumToggle.isSelected) allowedLevels.add("MEDIUM")
+            if (noneSelected || showLowToggle.isSelected) allowedLevels.add("LOW")
 
             rowSorter.rowFilter = object : RowFilter<DefaultTableModel, Int>() {
                 override fun include(entry: Entry<out DefaultTableModel, out Int>): Boolean {
@@ -277,6 +278,10 @@ class SafeGradleToolWindowFactory : ToolWindowFactory, DumbAware {
         }
 
         private fun rebuildTable() {
+            tableModel.setColumnIdentifiers(
+                if (groupByCheckToggle.isSelected) arrayOf("Check", "Line", "Risk", "Message")
+                else arrayOf("File", "Line", "Risk", "Message")
+            )
             tableModel.rowCount = 0
             flatViolations.clear()
             val orderedViolations = if (groupByCheckToggle.isSelected) {
