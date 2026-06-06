@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+## [0.0.36]
+
+### 🐛 Bug Fixes
+
+- **Filter buttons now work correctly**: Clicking `🔴 HIGH`, `🟠 MED`, or `🔵 LOW` in the tool window now shows only findings at that severity level. Previously the buttons started in a "selected" state and toggling them *hid* results instead — the logic was inverted. Buttons now start inactive (show all), and pressing one filters *to* that level. Multiple buttons can be pressed together to show any combination.
+- **LOW severity color**: Risk-level text for `LOW` findings in the results table was rendered in blue, making it visually identical to links. It is now displayed in gray for clear distinction from `HIGH` (red) and `MEDIUM` (orange).
+- **HTTP URL detection in `maven {}` blocks**: Plain `http://` repository URLs inside `maven { url = ... }` declarations were silently skipped and never flagged as MITM risks. The check now runs on all lines; legitimate HTTPS repository domains continue to be suppressed via the built-in whitelist.
+- **Plugin detection for Kotlin DSL syntax**: `id("com.example.plugin")` declarations were not detected by `PluginInjectionCheck`. The regex only handled Groovy-style `id 'plugin'` and `id "plugin"` forms. The pattern now correctly parses the parenthesised Kotlin form `id("…")`.
+- **`checkId` lost on disk cache round-trip**: `SafeGradleScanCache` stored violations without their `checkId` field. On the next IDE startup the field defaulted to `"unknown"`, breaking suppression entries and baseline matching that relied on the check identifier. The field is now persisted and restored correctly.
+- **`VulnerabilityCheck` violations missing `checkId`**: All six `SecurityViolation` constructors inside `VulnerabilityCheck` (static CVE, dynamic version, version range, `resolutionStrategy.force`, OSV advisory) omitted `checkId`. Suppressions targeting `dependency_vulnerability` now work as expected.
+- **Comment stripping inside string literals**: `SecurityUtils.stripComments()` used a naive `indexOf("//")` approach that truncated URLs in string literals — e.g. `"https://example.com"` was cut to `"https:`. Replaced with a state-machine parser that tracks open string delimiters (`"` and `'`) and only strips `//` sequences that appear outside of strings.
+- **YAML config section header parsing**: Section keys in `.safegradle.yml` (`whitelist_domains:`, `suppressions:`, etc.) were matched against the raw unindented line. Files with leading whitespace on section headers were silently ignored. Detection now uses the already-trimmed line so indented YAML is parsed correctly.
+- **"Group by Check" column header**: When the *Group by Check* toggle was active, the first column of the results table still showed the label **File** instead of **Check**. The header now updates dynamically when the toggle changes.
+
 ## [0.0.35]
 
 ### 🛡️ 17 New Security Checks

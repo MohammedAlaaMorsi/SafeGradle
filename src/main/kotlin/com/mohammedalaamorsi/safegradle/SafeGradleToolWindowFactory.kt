@@ -59,9 +59,9 @@ class SafeGradleToolWindowFactory : ToolWindowFactory, DumbAware {
 
         // Filter controls
         private val searchField = JTextField(20)
-        private val showHighToggle = JToggleButton("🔴 HIGH", true)
-        private val showMediumToggle = JToggleButton("🟠 MED", true)
-        private val showLowToggle = JToggleButton("🔵 LOW", true)
+        private val showHighToggle = JToggleButton("🔴 HIGH", false)
+        private val showMediumToggle = JToggleButton("🟠 MED", false)
+        private val showLowToggle = JToggleButton("🔵 LOW", false)
 
         init {
             project.messageBus.connect().subscribe(SafeGradleResultService.TOPIC, this)
@@ -176,7 +176,7 @@ class SafeGradleToolWindowFactory : ToolWindowFactory, DumbAware {
                         foreground = when (value) {
                             RiskLevel.HIGH -> Color.RED
                             RiskLevel.MEDIUM -> Color.ORANGE
-                            RiskLevel.LOW -> Color.BLUE
+                            RiskLevel.LOW -> Color(130, 130, 130)
                         }
                     }
                     return c
@@ -243,28 +243,36 @@ class SafeGradleToolWindowFactory : ToolWindowFactory, DumbAware {
 
         private fun applyFilter() {
             val baseline = if (newOnlyToggle.isSelected) SafeGradleBaseline.load(project) else emptySet()
-            val text = searchField.text.trim()
-
-            val allowedLevels = mutableSetOf<String>()
-            if (showHighToggle.isSelected) allowedLevels.add("HIGH")
-            if (showMediumToggle.isSelected) allowedLevels.add("MEDIUM")
-            if (showLowToggle.isSelected) allowedLevels.add("LOW")
+            val text = searchField.text.trim().lowercase()
+            val highOn = showHighToggle.isSelected
+            val medOn  = showMediumToggle.isSelected
+            val lowOn  = showLowToggle.isSelected
+            val anyOn  = highOn || medOn || lowOn
 
             rowSorter.rowFilter = object : RowFilter<DefaultTableModel, Int>() {
                 override fun include(entry: Entry<out DefaultTableModel, out Int>): Boolean {
-                    val modelRow = entry.identifier
-                    val violation = flatViolations.getOrNull(modelRow) ?: return false
+                    // Risk-level filter: read directly from column 2 (the RiskLevel object),
+                    // so this never depends on flatViolations ordering.
+                    if (anyOn) {
+                        val risk = entry.getValue(2) as? RiskLevel
+                        val pass = (highOn && risk == RiskLevel.HIGH) ||
+                                   (medOn  && risk == RiskLevel.MEDIUM) ||
+                                   (lowOn  && risk == RiskLevel.LOW)
+                        if (!pass) return false
+                    }
 
                     // Baseline filter
-                    if (baseline.isNotEmpty() && !SafeGradleBaseline.isNew(violation, baseline)) return false
+                    if (baseline.isNotEmpty()) {
+                        val violation = flatViolations.getOrNull(entry.identifier) ?: return false
+                        if (!SafeGradleBaseline.isNew(violation, baseline)) return false
+                    }
 
-                    // Risk level filter
-                    if (violation.riskLevel.name !in allowedLevels) return false
-
-                    // Text search filter
+                    // Text search
                     if (text.isNotEmpty()) {
-                        val haystack = "${violation.file.name} ${violation.message} ${violation.riskLevel}".lowercase()
-                        if (!haystack.contains(text.lowercase())) return false
+                        val row = (0 until entry.valueCount)
+                            .joinToString(" ") { entry.getStringValue(it) }
+                            .lowercase()
+                        if (!row.contains(text)) return false
                     }
 
                     return true
@@ -277,6 +285,10 @@ class SafeGradleToolWindowFactory : ToolWindowFactory, DumbAware {
         }
 
         private fun rebuildTable() {
+            tableModel.setColumnIdentifiers(
+                if (groupByCheckToggle.isSelected) arrayOf("Check", "Line", "Risk", "Message")
+                else arrayOf("File", "Line", "Risk", "Message")
+            )
             tableModel.rowCount = 0
             flatViolations.clear()
             val orderedViolations = if (groupByCheckToggle.isSelected) {

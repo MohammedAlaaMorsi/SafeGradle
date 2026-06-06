@@ -165,7 +165,7 @@ class SecurityCheckTests : BasePlatformTestCase() {
         assertEquals(RiskLevel.MEDIUM, violations[0].riskLevel)
     }
 
-    fun `test file exfiltration detects Files.copy`() {
+    fun `test file exfiltration detects Files copy`() {
         val check = FileExfiltrationCheck()
         val code = """Files.copy(src, dst)"""
         val file = myFixture.configureByText("build.gradle.kts", code)

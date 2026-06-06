@@ -90,7 +90,6 @@ class NetworkActivityCheck : SecurityCheck {
 
             // Skip legitimate dependency declarations and plugin repositories or safe blocks
             if (currentInsideSafeBlock ||
-                strippedLine.startsWith("maven") ||
                 strippedLine.startsWith("google()") ||
                 strippedLine.startsWith("classpath") ||
                 strippedLine.startsWith("implementation") ||

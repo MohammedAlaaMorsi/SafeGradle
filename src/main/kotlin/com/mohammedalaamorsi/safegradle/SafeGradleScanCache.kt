@@ -36,13 +36,14 @@ class SafeGradleScanCache : PersistentStateComponent<SafeGradleScanCache.State> 
         val entry = myState.cacheEntries[file.path] ?: return null
         if (entry.hash != file.modificationCount.toString()) return null
         
-        return entry.violations.map { 
+        return entry.violations.map {
             SecurityViolation(
                 file = file,
                 line = it.line,
                 content = it.content,
                 message = it.message,
-                riskLevel = RiskLevel.valueOf(it.riskLevel)
+                riskLevel = RiskLevel.valueOf(it.riskLevel),
+                checkId = it.checkId
             )
         }
     }
@@ -54,12 +55,13 @@ class SafeGradleScanCache : PersistentStateComponent<SafeGradleScanCache.State> 
     fun updateCache(file: VirtualFile, violations: List<SecurityViolation>) {
         val entry = CacheEntry(
             hash = file.modificationCount.toString(),
-            violations = violations.map { 
+            violations = violations.map {
                 CachedViolation(
                     line = it.line,
                     content = it.content,
                     message = it.message,
-                    riskLevel = it.riskLevel.name
+                    riskLevel = it.riskLevel.name,
+                    checkId = it.checkId
                 )
             }
         )
