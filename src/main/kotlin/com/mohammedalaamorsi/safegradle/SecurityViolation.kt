@@ -12,5 +12,7 @@ data class SecurityViolation(
     val content: String,
     val message: String,
     val riskLevel: RiskLevel,
-    val checkId: String = "unknown"
+    val checkId: String = "unknown",
+    /** Version that remediates the finding, when known — enables one-click upgrade. */
+    val fixVersion: String? = null
 )

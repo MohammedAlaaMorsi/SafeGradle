@@ -25,13 +25,19 @@ class SafeGradleFileWatcher(private val project: Project) : BulkFileListener {
         }
         if (relevant.isEmpty()) return
 
-        // Invalidate cache for changed files and re-scan asynchronously
-        ApplicationManager.getApplication().executeOnPooledThread {
-            val cache = SafeGradleScanCache.getInstance(project)
-            relevant.forEach { cache.invalidate(it) }
+        // Config and custom-check changes affect every file's results — only those need a full rescan.
+        val needsFullScan = relevant.any {
+            it.name == ".safegradle.yml" || it.path.contains("/.safegradle/")
+        }
 
-            val scanner = SecurityScanner()
-            val violations = scanner.scanProject(project)
+        ApplicationManager.getApplication().executeOnPooledThread {
+            val violations = if (needsFullScan) {
+                val cache = SafeGradleScanCache.getInstance(project)
+                relevant.forEach { cache.invalidate(it) }
+                SecurityScanner(CustomCheckLoader.loadChecks(project)).scanProject(project)
+            } else {
+                IncrementalScan.rescanFiles(project, relevant)
+            }
 
             ApplicationManager.getApplication().invokeLater {
                 SafeGradleResultService.getInstance(project).setResults(violations)

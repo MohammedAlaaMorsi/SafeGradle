@@ -2,6 +2,33 @@
 
 ## [Unreleased]
 
+## [0.0.37]
+
+### ✨ New Features
+
+- **One-click dependency upgrade**: Vulnerable dependencies now carry their fixed version (from the built-in CVE table and live OSV.dev advisory data). Right-click a finding in the tool window and choose *Upgrade to Fixed Version* to rewrite the dependency line — works in Groovy/Kotlin build scripts and `libs.versions.toml` (indirect `version.ref`/interpolated versions are detected and reported instead of being rewritten incorrectly).
+- **Security grade (A–F)**: Project security grade computed from weighted severity counts (5×HIGH + 2×MEDIUM + 1×LOW), shown in the status bar widget and tool window header.
+- **HTML report export**: New shareable, self-contained HTML report (no external assets) with grade, severity summary cards, distribution bar, and findings grouped by file — alongside CSV/JSON/SARIF.
+- **Clickable severity chips**: The 🔴/🟠/🔵 summary counts in the tool window are now clickable filters, synced with the filter toggle buttons.
+- **Row context menu**: Right-click any finding for *Jump to Source*, *Copy Violation Details*, *Upgrade to Fixed Version*, and *Suppress*.
+
+### ⚡ Performance
+
+- **Incremental rescan on save**: Saving a build file now rescans only the changed files and merges results, instead of walking the entire project tree (plus buildSrc, included builds, and global init scripts) on every save. Changes to `.safegradle.yml` or custom checks still trigger a full rescan.
+
+### 🐛 Bug Fixes
+
+- **Risk colors lost after "Group by Check"**: Toggling grouping rebuilt the table columns and silently dropped the severity color renderer and sort order; both are now restored.
+- **New results ignored grouping**: A rescan while *Group by Check* was active showed file names under the *Check* column.
+- **Table sorting**: The Line column sorted as text ("10" before "2") and Risk sorted alphabetically (HIGH < LOW < MEDIUM); both now sort correctly, with HIGH-first as the default order.
+- **Custom checks lost on auto-rescan**: The save watcher rescanned without user-defined custom checks, so their findings vanished after every save.
+- **Double-click crash**: Double-clicking the empty area below the results rows threw an `IndexOutOfBoundsException`.
+- **Scan history noise**: Identical consecutive scan snapshots are no longer recorded, keeping the trend meaningful.
+
+### 🎨 UI
+
+- **Plugin icon in the IDE**: The SafeGradle tool window and actions now use the SafeGradle logo instead of the generic IDE shield icon.
+
 ## [0.0.36]
 
 ### 🐛 Bug Fixes

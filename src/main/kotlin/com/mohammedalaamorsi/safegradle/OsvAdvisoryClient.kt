@@ -9,7 +9,49 @@ data class OsvVulnerability(val id: String, val summary: String)
 object OsvAdvisoryClient {
 
     private const val OSV_BATCH_URL = "https://api.osv.dev/v1/querybatch"
+    private const val OSV_VULN_URL = "https://api.osv.dev/v1/vulns/"
     private const val TIMEOUT_MS = 8_000
+
+    // vulnId:packageName → fixed version ("" caches a confirmed miss)
+    private val fixedVersionCache = java.util.concurrent.ConcurrentHashMap<String, String>()
+
+    /**
+     * Fetches the fixed version for [vulnId] affecting Maven package [packageName]
+     * ("group:artifact") from the OSV detail endpoint. Cached; fails soft to null.
+     */
+    fun fetchFixedVersion(vulnId: String, packageName: String): String? {
+        val cacheKey = "$vulnId:$packageName"
+        fixedVersionCache[cacheKey]?.let { return it.ifEmpty { null } }
+
+        val json = try {
+            val conn = java.net.URI(OSV_VULN_URL + vulnId).toURL().openConnection() as HttpURLConnection
+            conn.connectTimeout = TIMEOUT_MS
+            conn.readTimeout = TIMEOUT_MS
+            conn.inputStream.bufferedReader().readText()
+        } catch (e: Exception) {
+            return null // network failure: don't cache, allow retry on next scan
+        }
+
+        val fixed = extractFixedVersion(json, packageName)
+        fixedVersionCache[cacheKey] = fixed ?: ""
+        return fixed
+    }
+
+    /**
+     * Extracts the last "fixed" event for the affected block matching [packageName]
+     * from an OSV vulnerability JSON document. Internal for unit testing.
+     */
+    internal fun extractFixedVersion(json: String, packageName: String): String? {
+        val arrayStart = Regex(""""affected"\s*:\s*\[""").find(json) ?: return null
+        val affectedBlock = json.substring(arrayStart.range.last + 1)
+        if (affectedBlock.isBlank()) return null
+        val fixedRegex = Regex(""""fixed"\s*:\s*"([^"]+)"""")
+        for (block in splitTopLevelObjects(affectedBlock)) {
+            if (!block.contains("\"$packageName\"")) continue
+            return fixedRegex.findAll(block).lastOrNull()?.groupValues?.get(1)
+        }
+        return null
+    }
 
     // Returns a map of "group:artifact:version" → list of vulnerabilities found for it.
     // Only packages that have findings appear in the result.

@@ -38,7 +38,7 @@
                 instance="com.mohammedalaamorsi.safegradle.SafeGradleConfigurable"
                 id="com.mohammedalaamorsi.safegradle.settings"
                 displayName="SafeGradle Security"/>
-        <toolWindow id="SafeGradle" anchor="bottom" factoryClass="com.mohammedalaamorsi.safegradle.SafeGradleToolWindowFactory" icon="AllIcons.Actions.Shield"/>
+        <toolWindow id="SafeGradle" anchor="bottom" factoryClass="com.mohammedalaamorsi.safegradle.SafeGradleToolWindowFactory" icon="/icons/safegradle.svg"/>
         <statusBarWidgetFactory implementation="com.mohammedalaamorsi.safegradle.SafeGradleStatusBarWidgetFactory" id="SafeGradleStatusWidget" order="last"/>
         <externalAnnotator language="Groovy" implementationClass="com.mohammedalaamorsi.safegradle.SafeGradleAnnotator"/>
         <externalAnnotator language="kotlin" implementationClass="com.mohammedalaamorsi.safegradle.SafeGradleAnnotator"/>
@@ -70,11 +70,11 @@
     </applicationListeners>
 
     <actions>
-        <action id="com.mohammedalaamorsi.safegradle.scan" class="com.mohammedalaamorsi.safegradle.ScanAction" text="Scan Build Scripts for Security Risks" description="Scans gradle files for malicious code">
+        <action id="com.mohammedalaamorsi.safegradle.scan" class="com.mohammedalaamorsi.safegradle.ScanAction" icon="/icons/safegradle.svg" text="Scan Build Scripts for Security Risks" description="Scans gradle files for malicious code">
             <add-to-group group-id="ToolsMenu" anchor="last"/>
         </action>
         
-        <action id="com.github.safegradle.openSafe" class="com.mohammedalaamorsi.safegradle.OpenSafeProjectAction" text="Open in SafeGradle" icon="AllIcons.Actions.Shield" description="Select a project folder and scan for malicious code before opening">
+        <action id="com.github.safegradle.openSafe" class="com.mohammedalaamorsi.safegradle.OpenSafeProjectAction" text="Open in SafeGradle" icon="/icons/safegradle.svg" description="Select a project folder and scan for malicious code before opening">
             <add-to-group group-id="WelcomeScreen.QuickStart" anchor="first"/>
             <add-to-group group-id="MainMenu" anchor="last"/>
         </action>

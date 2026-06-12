@@ -22,7 +22,8 @@ class SafeGradleScanCache : PersistentStateComponent<SafeGradleScanCache.State> 
         var content: String = "",
         var message: String = "",
         var riskLevel: String = "",
-        var checkId: String = ""
+        var checkId: String = "",
+        var fixVersion: String = ""
     )
 
     private var myState = State()
@@ -43,7 +44,8 @@ class SafeGradleScanCache : PersistentStateComponent<SafeGradleScanCache.State> 
                 content = it.content,
                 message = it.message,
                 riskLevel = RiskLevel.valueOf(it.riskLevel),
-                checkId = it.checkId
+                checkId = it.checkId,
+                fixVersion = it.fixVersion.ifEmpty { null }
             )
         }
     }
@@ -61,7 +63,8 @@ class SafeGradleScanCache : PersistentStateComponent<SafeGradleScanCache.State> 
                     content = it.content,
                     message = it.message,
                     riskLevel = it.riskLevel.name,
-                    checkId = it.checkId
+                    checkId = it.checkId,
+                    fixVersion = it.fixVersion ?: ""
                 )
             }
         )
