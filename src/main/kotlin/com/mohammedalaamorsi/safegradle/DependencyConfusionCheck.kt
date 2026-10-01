@@ -16,29 +16,38 @@ class DependencyConfusionCheck : SecurityCheck {
     )
 
     private val dependencyPattern = Pattern.compile("['\"]([^'\"]+):([^'\"]+):([^'\"]+)['\"]")
+    private val lockfilePattern = Pattern.compile("""^([a-zA-Z0-9._\-]+):([a-zA-Z0-9._\-]+):([^=:\s]+)(?:=.*)?$""")
 
     override fun check(file: VirtualFile, content: String, project: Project?, teamConfig: YamlConfig?): List<SecurityViolation> {
         val violations = mutableListOf<SecurityViolation>()
         val lines = content.lines()
+        val isLockfile = file.name == "gradle.lockfile" || file.name.endsWith(".lockfile")
 
         lines.forEachIndexed { index, line ->
-            val matcher = dependencyPattern.matcher(line)
-            if (matcher.find()) {
-                val group = matcher.group(1)
-                
-                // Check for common typos or suspicious patterns in popular groups
-                for (popular in popularGroups) {
-                    if (group != popular && isSuspiciouslySimilar(group, popular)) {
-                        violations.add(
-                            SecurityViolation(
-                                file = file,
-                                line = index + 1,
-                                content = line.trim(),
-                                message = "Potential typosquatting detected! '$group' is suspiciously similar to popular group '$popular'.",
-                                riskLevel = RiskLevel.HIGH
-                            )
+            val trimmed = line.trim()
+            if (trimmed.isEmpty() || trimmed.startsWith("#") || trimmed.startsWith("//")) return@forEachIndexed
+
+            val group = if (isLockfile) {
+                val m = lockfilePattern.matcher(trimmed)
+                if (m.find()) m.group(1) else null
+            } else {
+                val m = dependencyPattern.matcher(line)
+                if (m.find()) m.group(1) else null
+            } ?: return@forEachIndexed
+
+            // Check for common typos or suspicious patterns in popular groups
+            for (popular in popularGroups) {
+                if (group != popular && isSuspiciouslySimilar(group, popular)) {
+                    violations.add(
+                        SecurityViolation(
+                            file = file,
+                            line = index + 1,
+                            content = trimmed,
+                            message = "Potential typosquatting detected! '$group' is suspiciously similar to popular group '$popular'.",
+                            riskLevel = RiskLevel.HIGH,
+                            checkId = id
                         )
-                    }
+                    )
                 }
             }
         }
@@ -67,3 +76,4 @@ class DependencyConfusionCheck : SecurityCheck {
         return dp[s1.length][s2.length]
     }
 }
+

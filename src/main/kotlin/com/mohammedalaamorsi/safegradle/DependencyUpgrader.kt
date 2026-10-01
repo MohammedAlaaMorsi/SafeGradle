@@ -13,6 +13,9 @@ object DependencyUpgrader {
     // TOML table entry: version = "x.y.z" (version.ref handled separately)
     private val tomlVersionPattern = Regex("""(version\s*=\s*")([^"$]+)(")""")
 
+    // Lockfile entry: group:artifact:version=configs or group:artifact:version
+    private val lockfilePattern = Regex("""^([a-zA-Z0-9._\-]+:[a-zA-Z0-9._\-]+):([^=:\s]+)(.*)$""")
+
     fun upgradeLine(line: String, fixVersion: String): String? {
         if (line.contains("version.ref")) return null
 
@@ -25,6 +28,15 @@ object DependencyUpgrader {
         tomlVersionPattern.find(line)?.let { m ->
             if (m.groupValues[2] == fixVersion) return null
             return line.replaceRange(m.range, "${m.groupValues[1]}$fixVersion${m.groupValues[3]}")
+        }
+
+        lockfilePattern.find(line.trim())?.let { m ->
+            val module = m.groupValues[1]
+            val version = m.groupValues[2]
+            val suffix = m.groupValues[3]
+            if (version == fixVersion) return null
+            val indent = line.takeWhile { it.isWhitespace() }
+            return "$indent$module:$fixVersion$suffix"
         }
 
         return null

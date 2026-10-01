@@ -64,6 +64,8 @@ class SafeGradleInspection : LocalInspectionTool() {
     private fun isGradleFile(file: PsiFile): Boolean {
         val name = file.name
         return name.endsWith(".gradle") || name.endsWith(".gradle.kts") ||
-               name == "gradle.properties" || name == "libs.versions.toml"
+               name == "gradle.properties" || name == "libs.versions.toml" ||
+               name == "gradle-wrapper.properties" || name.endsWith(".lockfile")
     }
 }
+

@@ -325,9 +325,15 @@ class SafeGradleToolWindowFactory : ToolWindowFactory, DumbAware {
             menu.add(upgradeItem)
             menu.addPopupMenuListener(object : javax.swing.event.PopupMenuListener {
                 override fun popupMenuWillBecomeVisible(e: javax.swing.event.PopupMenuEvent) {
-                    val fix = selectedViolation()?.fixVersion
+                    val v = selectedViolation()
+                    val fix = v?.fixVersion
+                    val isWrapper = (v?.checkId == "gradle_wrapper_integrity" || v?.file?.name == "gradle-wrapper.properties") && fix != null
                     upgradeItem.isEnabled = fix != null
-                    upgradeItem.text = if (fix != null) "Upgrade to Fixed Version ($fix)" else "Upgrade to Fixed Version"
+                    upgradeItem.text = when {
+                        isWrapper -> "Add Official Checksum (${fix!!.take(8)}...)"
+                        fix != null -> "Upgrade to Fixed Version ($fix)"
+                        else -> "Upgrade to Fixed Version"
+                    }
                 }
                 override fun popupMenuWillBecomeInvisible(e: javax.swing.event.PopupMenuEvent) {}
                 override fun popupMenuCanceled(e: javax.swing.event.PopupMenuEvent) {}
@@ -360,6 +366,12 @@ class SafeGradleToolWindowFactory : ToolWindowFactory, DumbAware {
             val fix = violation.fixVersion ?: return
             val fileDocManager = com.intellij.openapi.fileEditor.FileDocumentManager.getInstance()
             val document = fileDocManager.getDocument(violation.file) ?: return
+
+            if (violation.checkId == "gradle_wrapper_integrity" || violation.file.name == "gradle-wrapper.properties") {
+                applyWrapperChecksumFix(violation, fix, document)
+                return
+            }
+
             val lineIndex = violation.line - 1
             if (lineIndex < 0 || lineIndex >= document.lineCount) return
             val start = document.getLineStartOffset(lineIndex)
@@ -377,6 +389,32 @@ class SafeGradleToolWindowFactory : ToolWindowFactory, DumbAware {
                 document.replaceString(start, end, upgraded)
                 fileDocManager.saveDocument(document)
             }
+            com.intellij.openapi.application.ApplicationManager.getApplication().executeOnPooledThread {
+                val merged = IncrementalScan.rescanFiles(project, listOf(violation.file))
+                com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater {
+                    SafeGradleResultService.getInstance(project).setResults(merged)
+                }
+            }
+        }
+
+        private fun applyWrapperChecksumFix(violation: SecurityViolation, checksum: String, document: com.intellij.openapi.editor.Document) {
+            val fileDocManager = com.intellij.openapi.fileEditor.FileDocumentManager.getInstance()
+            val text = document.text
+            val propKey = "distributionSha256Sum="
+
+            com.intellij.openapi.command.WriteCommandAction.runWriteCommandAction(project) {
+                if (text.contains(propKey)) {
+                    val regex = Regex("""distributionSha256Sum\s*=.*""")
+                    val newText = regex.replace(text, "distributionSha256Sum=$checksum")
+                    document.setText(newText)
+                } else {
+                    val sep = if (text.endsWith("\n")) "" else "\n"
+                    document.insertString(document.textLength, "${sep}distributionSha256Sum=$checksum\n")
+                }
+                fileDocManager.saveDocument(document)
+            }
+
+            Messages.showInfoMessage(project, "Added official distributionSha256Sum to gradle-wrapper.properties.", "SafeGradle")
             com.intellij.openapi.application.ApplicationManager.getApplication().executeOnPooledThread {
                 val merged = IncrementalScan.rescanFiles(project, listOf(violation.file))
                 com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater {
@@ -473,3 +511,4 @@ class SafeGradleToolWindowFactory : ToolWindowFactory, DumbAware {
         }
     }
 }
+

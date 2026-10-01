@@ -154,6 +154,64 @@ class SecurityCheckTests : BasePlatformTestCase() {
         assertNotEmpty(check.check(file.virtualFile, code, project))
     }
 
+    fun `test lockfile scanner flags vulnerable dependency in gradle lockfile`() {
+        val check = VulnerabilityCheck()
+        val lockContent = """
+            # Lockfile
+            org.apache.logging.log4j:log4j-core:2.14.1=compileClasspath,runtimeClasspath
+            com.google.guava:guava:32.0.0-jre=compileClasspath
+        """.trimIndent()
+        val file = myFixture.configureByText("gradle.lockfile", lockContent)
+        val violations = check.check(file.virtualFile, lockContent, project)
+        assertNotEmpty(violations)
+        val log4j = violations.first { it.line == 2 }
+        assertEquals(RiskLevel.HIGH, log4j.riskLevel)
+        assertTrue(log4j.message.contains("CVE-2021-44228"))
+        assertEquals("2.16.0", log4j.fixVersion)
+    }
+
+    fun `test lockfile scanner passes safe lockfile`() {
+        val check = VulnerabilityCheck()
+        val lockContent = """
+            # Lockfile
+            org.apache.logging.log4j:log4j-core:2.17.0=compileClasspath
+            com.google.guava:guava:32.0.0-jre=compileClasspath
+        """.trimIndent()
+        val file = myFixture.configureByText("compileClasspath.lockfile", lockContent)
+        val violations = check.check(file.virtualFile, lockContent, project)
+        assertTrue(violations.none { it.message.contains("CVE") })
+    }
+
+    fun `test lockfile flags snapshot dependency`() {
+        val check = VulnerabilityCheck()
+        val lockContent = "com.example:internal-lib:1.0.0-SNAPSHOT=compileClasspath"
+        val file = myFixture.configureByText("gradle.lockfile", lockContent)
+        val violations = check.check(file.virtualFile, lockContent, project)
+        assertNotEmpty(violations)
+        assertEquals(RiskLevel.MEDIUM, violations[0].riskLevel)
+        assertTrue(violations[0].message.contains("snapshot"))
+    }
+
+    fun `test dependency confusion flags typosquatting in lockfile`() {
+        val check = DependencyConfusionCheck()
+        val lockContent = "com.gooogle.guava:guava:31.0-jre=compileClasspath"
+        val file = myFixture.configureByText("gradle.lockfile", lockContent)
+        val violations = check.check(file.virtualFile, lockContent, project)
+        assertNotEmpty(violations)
+        assertEquals(RiskLevel.HIGH, violations[0].riskLevel)
+        assertTrue(violations[0].message.contains("typosquatting"))
+    }
+
+    fun `test dependency lock check flags empty lockfile`() {
+        val check = DependencyLockCheck()
+        val lockContent = "# Lockfile\nempty=\n"
+        val file = myFixture.configureByText("gradle.lockfile", lockContent)
+        val violations = check.check(file.virtualFile, lockContent, project)
+        assertNotEmpty(violations)
+        assertEquals(RiskLevel.LOW, violations[0].riskLevel)
+        assertTrue(violations[0].message.contains("no locked dependencies"))
+    }
+
     // ─── FileExfiltrationCheck ────────────────────────────────────────────
 
     fun `test file exfiltration detects FileOutputStream`() {

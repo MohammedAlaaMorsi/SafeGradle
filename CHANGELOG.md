@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [0.0.38]
+
+### ✨ New Features
+
+- **Batch Quick-Fix All (1-Click Bulk Remediation)**: Fix all auto-remediable security issues across your entire project in a single click from the SafeGradle tool window. Automatically upgrades insecure HTTP URLs to HTTPS, inserts official Gradle wrapper SHA-256 checksums, and replaces deprecated `jcenter()` repositories with `mavenCentral()`. Backed by atomic undo (`Ctrl+Z` / `Cmd+Z`) and automated incremental rescan.
+- **Pre-Sync Execution Guard**: Automatically intercepts Gradle project sync when high-severity security violations are detected. Alerts the developer with an actionable dialog to review findings before Gradle executes build scripts and resolves dependencies.
+- **Gradle Wrapper Integrity & Binary Verification**: Automated lookup for official Gradle release SHA-256 distribution checksums, local `gradle-wrapper.jar` binary hash verification, and editor quick-fix intention to remediate missing or tampered wrapper checksums.
+- **Lockfile & Transitive Dependency Scanning**: Scans Gradle lockfiles (`gradle.lockfile`) for vulnerable transitive dependencies, and checks for dependency confusion attack surfaces and undeclared public repository risks.
+- **Interactive Rules & Checks Manager**: Dedicated settings configuration panel (**Settings → Tools → SafeGradle**) to view, filter, and toggle individual security rules with custom descriptions and severity indicators.
+
 ## [0.0.37]
 
 ### ✨ New Features

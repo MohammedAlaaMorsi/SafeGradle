@@ -59,6 +59,10 @@
             <className>com.mohammedalaamorsi.safegradle.PinDynamicVersionIntention</className>
             <category>SafeGradle</category>
         </intentionAction>
+        <intentionAction>
+            <className>com.mohammedalaamorsi.safegradle.FixGradleWrapperChecksumIntention</className>
+            <category>SafeGradle</category>
+        </intentionAction>
     </extensions>
 
     <extensions defaultExtensionNs="org.jetbrains.kotlin">

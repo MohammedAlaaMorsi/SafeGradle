@@ -62,4 +62,24 @@ class DependencyUpgraderTest : TestCase() {
     fun `test returns null when no dependency on line`() {
         assertNull(DependencyUpgrader.upgradeLine("plugins {", "1.0.0"))
     }
+
+    fun `test upgrades lockfile line with configurations`() {
+        assertEquals(
+            "org.apache.logging.log4j:log4j-core:2.16.0=compileClasspath,runtimeClasspath",
+            DependencyUpgrader.upgradeLine("org.apache.logging.log4j:log4j-core:2.14.1=compileClasspath,runtimeClasspath", "2.16.0")
+        )
+    }
+
+    fun `test upgrades lockfile line without configurations`() {
+        assertEquals(
+            "com.google.guava:guava:32.0.0-jre=",
+            DependencyUpgrader.upgradeLine("com.google.guava:guava:31.0-jre=", "32.0.0-jre")
+        )
+    }
+
+    fun `test lockfile returns null when already at fix version`() {
+        assertNull(
+            DependencyUpgrader.upgradeLine("org.apache.logging.log4j:log4j-core:2.16.0=compileClasspath", "2.16.0")
+        )
+    }
 }
