@@ -34,10 +34,10 @@ object YamlConfigParser {
             if (trimmed.isEmpty() || trimmed.startsWith("#")) continue
 
             when {
-                line.startsWith("whitelist_domains:") -> { currentSection = "whitelist"; continue }
-                line.startsWith("suppressions:") -> { currentSection = "suppressions"; continue }
-                line.startsWith("severity_overrides:") -> { currentSection = "severity_overrides"; continue }
-                line.startsWith("allowed_script_sources:") -> { currentSection = "allowed_script_sources"; continue }
+                trimmed.startsWith("whitelist_domains:") -> { currentSection = "whitelist"; continue }
+                trimmed.startsWith("suppressions:") -> { currentSection = "suppressions"; continue }
+                trimmed.startsWith("severity_overrides:") -> { currentSection = "severity_overrides"; continue }
+                trimmed.startsWith("allowed_script_sources:") -> { currentSection = "allowed_script_sources"; continue }
             }
 
             when (currentSection) {

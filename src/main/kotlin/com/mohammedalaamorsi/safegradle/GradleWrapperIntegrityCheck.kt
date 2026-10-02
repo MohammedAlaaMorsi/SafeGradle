@@ -14,29 +14,34 @@ class GradleWrapperIntegrityCheck : SecurityCheck {
         "downloads.gradle.org"
     )
 
-    // Known-good SHA-256 checksums published by Gradle at https://gradle.org/release-checksums/
-    // Format: "version-type" -> sha256  (type = bin or all)
-    private val knownChecksums = mapOf(
-        "9.2.1-bin"  to "c6fabe6485c4e5c69fba02ff78e9bd898aa635f9e43f00bb54ded05a09a7e35a",
-        "9.2.1-all"  to "e33f7df7e73fdfc3de7afbba5c7bce7d2d2e61f6c39e98fecee1be2e0cb21f4c",
-        "9.2-bin"    to "a99e4a5e33e63e0edc8e51c4e2e44e6e7bbef03c8ef745f07064e26a4c58e8ad",
-        "9.2-all"    to "a6d0e3a7988b7a74d2e2f88d35ba4f5607facd38e32b36e36fa63f3e5a7f4b4e",
-        "9.1-bin"    to "e1efa3b4a26fa77e0ae7f99bc25ea2b2a03bf8ba3e7e1e33e4fd4e7a31e5cf5d",
-        "9.1-all"    to "acb74c77a9c07b07de30a82f5d2acad27b763a7e0a8e3e4f5a8e0e7d68a4e0a6",
-        "9.0-bin"    to "d725bc8d95a83d9c2fe3756c4e76f3cbe55a8ad6b0b6f2c7c5c65e9a9e3e4e7d",
-        "8.14.1-bin" to "98592b4f8fbb5cd5e7e55c6e5e7c8f9b0d3e5e9b5e2e3c5b7e0d2e8b4d6e3c5",
-        "8.14.1-all" to "e8f4c6b9d1e3f5a7c0b2d4e6a8c0b2d4e6f8a0b2c4d6e8a0b2d4e6f8a0b2c4",
-        "8.14-bin"   to "a0b2c4d6e8a0b2c4d6e8a0b2c4d6e8a0b2c4d6e8a0b2c4d6e8a0b2c4d6e8a0",
-        "8.14-all"   to "b2c4d6e8a0b2c4d6e8a0b2c4d6e8a0b2c4d6e8a0b2c4d6e8a0b2c4d6e8a0b2",
-        "8.13-bin"   to "4b189f3b79d7f8e9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2",
-        "8.13-all"   to "5c2a3b4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a",
-        "8.12.1-bin" to "6d3b4c5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b",
-        "8.12-bin"   to "7e4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b",
-        "8.11.1-bin" to "8f5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c",
-        "8.10.2-bin" to "9a6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d",
-        "8.9-bin"    to "ab7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e",
-        "8.8-bin"    to "bc8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f"
-    )
+    companion object {
+        // Official SHA-256 checksums from https://services.gradle.org/distributions/gradle-<version>-<type>.zip.sha256
+        // Key: "version-type" (type = bin or all)
+        private val knownChecksums = mapOf(
+            "9.2.1-bin"  to "72f44c9f8ebcb1af43838f45ee5c4aa9c5444898b3468ab3f4af7b6076c5bc3f",
+            "9.2.1-all"  to "f86344275d1b194688dd330abf9f6f2344cd02872ffee035f2d1ea2fd60cf7f3",
+            "9.2.0-bin"  to "df67a32e86e3276d011735facb1535f64d0d88df84fa87521e90becc2d735444",
+            "9.2.0-all"  to "16f2b95838c1ddcf7242b1c39e7bbbb43c842f1f1a1a0dc4959b6d4d68abcac3",
+            "9.1.0-bin"  to "a17ddd85a26b6a7f5ddb71ff8b05fc5104c0202c6e64782429790c933686c806",
+            "9.1.0-all"  to "b84e04fa845fecba48551f425957641074fcc00a88a84d2aae5808743b35fc85",
+            "9.0.0-bin"  to "8fad3d78296ca518113f3d29016617c7f9367dc005f932bd9d93bf45ba46072b",
+            "9.0.0-all"  to "f759b8dd5204e2e3fa4ca3e73f452f087153cf81bac9561eeb854229cc2c5365",
+            "8.14.1-bin" to "845952a9d6afa783db70bb3b0effaae45ae5542ca2bb7929619e8af49cb634cf",
+            "8.14.1-all" to "d7042b3c11565c192041fc8c4703f541b888286404b4f267138c1d094d8ecdca",
+            "8.14-bin"   to "61ad310d3c7d3e5da131b76bbf22b5a4c0786e9d892dae8c1658d4b484de3caa",
+            "8.14-all"   to "efe9a3d147d948d7528a9887fa35abcf24ca1a43ad06439996490f77569b02d1",
+            "8.13-bin"   to "20f1b1176237254a6fc204d8434196fa11a4cfb387567519c61556e8710aed78",
+            "8.13-all"   to "fba8464465835e74f7270bbf43d6d8a8d7709ab0a43ce1aa3323f73e9aa0c612",
+            "8.12.1-bin" to "8d97a97984f6cbd2b85fe4c60a743440a347544bf18818048e611f5288d46c94",
+            "8.12-bin"   to "7a00d51fb93147819aab76024feece20b6b84e420694101f276be952e08bef03",
+            "8.11.1-bin" to "f397b287023acdba1e9f6fc5ea72d22dd63669d59ed4a289a29b1a76eee151c6",
+            "8.10.2-bin" to "31c55713e40233a8303827ceb42ca48a47267a0ad4bab9177123121e71524c26",
+            "8.9-bin"    to "d725d707bfabd4dfdc958c624003b3c80accc03f7037b5122c4b1d0ef15cecab",
+            "8.8-bin"    to "a4b4158601f8636cdeeab09bd76afb640030bb5b144aafe261a5e8af027dc612"
+        )
+
+        fun lookupExpectedChecksum(version: String, type: String): String? = knownChecksums["$version-$type"]
+    }
 
     override fun check(file: VirtualFile, content: String, project: Project?, teamConfig: YamlConfig?): List<SecurityViolation> {
         if (file.name != "gradle-wrapper.properties") return emptyList()
@@ -94,7 +99,8 @@ class GradleWrapperIntegrityCheck : SecurityCheck {
                     content = file.name,
                     message = "Gradle wrapper is missing 'distributionSha256Sum'. " +
                             "Add this property to cryptographically verify the downloaded Gradle distribution.",
-                    riskLevel = RiskLevel.LOW
+                    riskLevel = RiskLevel.LOW,
+                    fixVersion = if (detectedVersion != null && detectedType != null) lookupExpectedChecksum(detectedVersion!!, detectedType!!) else null
                 )
             )
         } else if (detectedVersion != null && detectedType != null && declaredChecksum != null) {
@@ -108,7 +114,8 @@ class GradleWrapperIntegrityCheck : SecurityCheck {
                         content = "distributionSha256Sum=$declaredChecksum",
                         message = "Gradle wrapper SHA-256 checksum for $lookupKey does not match the known-good value published by Gradle. " +
                                 "Expected: $expectedChecksum. This may indicate tampering.",
-                        riskLevel = RiskLevel.HIGH
+                        riskLevel = RiskLevel.HIGH,
+                        fixVersion = expectedChecksum
                     )
                 )
             }

@@ -16,29 +16,40 @@ class DependencyConfusionCheck : SecurityCheck {
     )
 
     private val dependencyPattern = Pattern.compile("['\"]([^'\"]+):([^'\"]+):([^'\"]+)['\"]")
+    private val lockfilePattern = Pattern.compile("""^([a-zA-Z0-9._\-]+):([a-zA-Z0-9._\-]+):([^=:\s]+)(?:=.*)?$""")
 
     override fun check(file: VirtualFile, content: String, project: Project?, teamConfig: YamlConfig?): List<SecurityViolation> {
         val violations = mutableListOf<SecurityViolation>()
         val lines = content.lines()
+        val isLockfile = file.name == "gradle.lockfile" || file.name.endsWith(".lockfile")
 
         lines.forEachIndexed { index, line ->
-            val matcher = dependencyPattern.matcher(line)
-            if (matcher.find()) {
-                val group = matcher.group(1)
-                
-                // Check for common typos or suspicious patterns in popular groups
-                for (popular in popularGroups) {
-                    if (group != popular && isSuspiciouslySimilar(group, popular)) {
-                        violations.add(
-                            SecurityViolation(
-                                file = file,
-                                line = index + 1,
-                                content = line.trim(),
-                                message = "Potential typosquatting detected! '$group' is suspiciously similar to popular group '$popular'.",
-                                riskLevel = RiskLevel.HIGH
-                            )
+            val trimmed = line.trim()
+            if (trimmed.isEmpty() || trimmed.startsWith("#") || trimmed.startsWith("//")) return@forEachIndexed
+
+            val group = if (isLockfile) {
+                val m = lockfilePattern.matcher(trimmed)
+                if (m.find()) m.group(1) else null
+            } else {
+                val m = dependencyPattern.matcher(line)
+                if (m.find()) m.group(1) else null
+            } ?: return@forEachIndexed
+
+            // Check for common typos or suspicious patterns in popular groups
+            for (popular in popularGroups) {
+                // Compare only the leading segments so sub-groups like "com.gooogle.guava" are caught
+                val prefix = group.split('.').take(popular.count { it == '.' } + 1).joinToString(".")
+                if (prefix != popular && isSuspiciouslySimilar(prefix, popular)) {
+                    violations.add(
+                        SecurityViolation(
+                            file = file,
+                            line = index + 1,
+                            content = trimmed,
+                            message = "Potential typosquatting detected! '$group' is suspiciously similar to popular group '$popular'.",
+                            riskLevel = RiskLevel.HIGH,
+                            checkId = id
                         )
-                    }
+                    )
                 }
             }
         }
@@ -50,20 +61,8 @@ class DependencyConfusionCheck : SecurityCheck {
         if (s1.contains(s2) && s1.length > s2.length + 3) return false // legitimate sub-package
         
         // Check for common typos like double letters or swapped letters
-        val distance = levenshteinDistance(s1, s2)
+        val distance = SecurityUtils.levenshtein(s1, s2)
         return distance == 1 || (distance == 2 && s1.length == s2.length)
     }
-
-    private fun levenshteinDistance(s1: String, s2: String): Int {
-        val dp = Array(s1.length + 1) { IntArray(s2.length + 1) }
-        for (i in 0..s1.length) dp[i][0] = i
-        for (j in 0..s2.length) dp[0][j] = j
-        for (i in 1..s1.length) {
-            for (j in 1..s2.length) {
-                val cost = if (s1[i - 1] == s2[j - 1]) 0 else 1
-                dp[i][j] = minOf(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + cost)
-            }
-        }
-        return dp[s1.length][s2.length]
-    }
 }
+

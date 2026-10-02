@@ -23,6 +23,9 @@ class SafeGradleScanHistory : PersistentStateComponent<SafeGradleScanHistory.Sta
     override fun loadState(state: State) { myState = state }
 
     fun record(high: Int, medium: Int, low: Int) {
+        // Skip duplicate consecutive snapshots so rapid rescans don't flood the trend
+        val last = myState.snapshots.lastOrNull()
+        if (last != null && last.high == high && last.medium == medium && last.low == low) return
         myState.snapshots.add(SnapshotEntry(System.currentTimeMillis(), high, medium, low))
         if (myState.snapshots.size > 10) {
             myState.snapshots = myState.snapshots.takeLast(10).toMutableList()

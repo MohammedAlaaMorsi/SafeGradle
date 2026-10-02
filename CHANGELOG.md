@@ -2,6 +2,83 @@
 
 ## [Unreleased]
 
+## [0.0.39]
+
+### ✨ New Features
+
+- **Remote Build Cache Safety**: Flags `isPush = true` inside a `remote { }` build-cache block — any developer machine can poison the shared cache with tampered outputs, so pushing must be restricted to CI (`isPush = System.getenv("CI") != null`). Also flags `allowUntrustedServer`, which disables TLS validation on the cache connection.
+- **Gradle Plugin Supply Chain**: Detects plugin IDs that impersonate popular Gradle plugins (one- or two-character typosquats), plugin IDs that were relocated and no longer receive security fixes, and unpinned plugin versions (`+`, `latest.release`, ranges, `-SNAPSHOT`) that can silently pull in a compromised release. Works in build scripts, `settings.gradle`, and `libs.versions.toml`.
+- **Dependency Verification**: Warns when `gradle/verification-metadata.xml` is missing, and flags weakened metadata — `verify-metadata` set to `false`, a `<trust>` rule that matches every artifact, or SHA-1/MD5-only checksums.
+- **Copyleft Licence Detection** (opt-in): Flags dependencies published under GPL, AGPL, or SSPL, which can require releasing your source code when distributed or offered as a service. Disabled by default since it needs Maven Central access; enable it under **Settings → Tools → SafeGradle**. LGPL, dual licences with a permissive option, and GPL with the Classpath Exception are not flagged.
+
+### 🔧 Improvements & Fixes
+
+- **Rule settings are now enforced by the scanner**: Disabling a check in **Settings → Tools → SafeGradle** now skips it entirely, and per-project severity overrides are applied to findings. The scan cache is cleared whenever rules change, since cache entries are keyed on file content only and would otherwise serve stale results.
+- **Every violation now carries its real check ID**: Checks that didn't set a `checkId` reported `unknown`, so severity overrides and suppressions silently never matched them.
+- **Real Gradle wrapper checksums**: The wrapper integrity check used placeholder checksum values. It now carries the official SHA-256 digests published by Gradle for 8.8 – 9.2.1 (`bin` and `all`), so genuine wrappers verify clean and a mismatch raises a HIGH-severity tampering alert.
+- **One-click wrapper auto-fix**: Missing or mismatched `distributionSha256Sum` findings now offer a fix that writes the correct checksum into `gradle-wrapper.properties`.
+- **Dependency confusion catches lookalike sub-groups**: Similarity is compared against the leading segments of the group ID, so names like `com.gooogle.guava` are detected.
+- **Shared Levenshtein helper**: Moved into `SecurityUtils` so the plugin-portal and dependency-confusion checks share one implementation.
+
+### 🧪 Testing
+
+- Added unit-test coverage for the new checks and the batch quick-fix engine — `BatchQuickFixEngineTest` (18 tests), `LicenseCheckTest` (12 tests), and new `BuildCacheCheck` / `PluginPortalCheck` / `DependencyVerificationCheck` cases in `SecurityCheckTests`. The suite now runs 139 tests, all green.
+
+### 🚀 Release Automation
+
+- Marketplace publishing is now automated: pushing a `v*.*.*` tag builds the plugin, runs the IntelliJ Plugin Verifier, gates on `tag == pluginVersion`, and publishes with that version's changelog notes.
+
+## [0.0.38]
+
+### ✨ New Features
+
+- **Batch Quick-Fix All (1-Click Bulk Remediation)**: Fix all auto-remediable security issues across your entire project in a single click from the SafeGradle tool window. Automatically upgrades insecure HTTP URLs to HTTPS, inserts official Gradle wrapper SHA-256 checksums, and replaces deprecated `jcenter()` repositories with `mavenCentral()`. Backed by atomic undo (`Ctrl+Z` / `Cmd+Z`) and automated incremental rescan.
+- **Pre-Sync Execution Guard**: Automatically intercepts Gradle project sync when high-severity security violations are detected. Alerts the developer with an actionable dialog to review findings before Gradle executes build scripts and resolves dependencies.
+- **Gradle Wrapper Integrity & Binary Verification**: Automated lookup for official Gradle release SHA-256 distribution checksums, local `gradle-wrapper.jar` binary hash verification, and editor quick-fix intention to remediate missing or tampered wrapper checksums.
+- **Lockfile & Transitive Dependency Scanning**: Scans Gradle lockfiles (`gradle.lockfile`) for vulnerable transitive dependencies, and checks for dependency confusion attack surfaces and undeclared public repository risks.
+- **Interactive Rules & Checks Manager**: Dedicated settings configuration panel (**Settings → Tools → SafeGradle**) to view, filter, and toggle individual security rules with custom descriptions and severity indicators.
+
+## [0.0.37]
+
+### ✨ New Features
+
+- **One-click dependency upgrade**: Vulnerable dependencies now carry their fixed version (from the built-in CVE table and live OSV.dev advisory data). Right-click a finding in the tool window and choose *Upgrade to Fixed Version* to rewrite the dependency line — works in Groovy/Kotlin build scripts and `libs.versions.toml` (indirect `version.ref`/interpolated versions are detected and reported instead of being rewritten incorrectly).
+- **Security grade (A–F)**: Project security grade computed from weighted severity counts (5×HIGH + 2×MEDIUM + 1×LOW), shown in the status bar widget and tool window header.
+- **HTML report export**: New shareable, self-contained HTML report (no external assets) with grade, severity summary cards, distribution bar, and findings grouped by file — alongside CSV/JSON/SARIF.
+- **Clickable severity chips**: The 🔴/🟠/🔵 summary counts in the tool window are now clickable filters, synced with the filter toggle buttons.
+- **Row context menu**: Right-click any finding for *Jump to Source*, *Copy Violation Details*, *Upgrade to Fixed Version*, and *Suppress*.
+
+### ⚡ Performance
+
+- **Incremental rescan on save**: Saving a build file now rescans only the changed files and merges results, instead of walking the entire project tree (plus buildSrc, included builds, and global init scripts) on every save. Changes to `.safegradle.yml` or custom checks still trigger a full rescan.
+
+### 🐛 Bug Fixes
+
+- **Risk colors lost after "Group by Check"**: Toggling grouping rebuilt the table columns and silently dropped the severity color renderer and sort order; both are now restored.
+- **New results ignored grouping**: A rescan while *Group by Check* was active showed file names under the *Check* column.
+- **Table sorting**: The Line column sorted as text ("10" before "2") and Risk sorted alphabetically (HIGH < LOW < MEDIUM); both now sort correctly, with HIGH-first as the default order.
+- **Custom checks lost on auto-rescan**: The save watcher rescanned without user-defined custom checks, so their findings vanished after every save.
+- **Double-click crash**: Double-clicking the empty area below the results rows threw an `IndexOutOfBoundsException`.
+- **Scan history noise**: Identical consecutive scan snapshots are no longer recorded, keeping the trend meaningful.
+
+### 🎨 UI
+
+- **Plugin icon in the IDE**: The SafeGradle tool window and actions now use the SafeGradle logo instead of the generic IDE shield icon.
+
+## [0.0.36]
+
+### 🐛 Bug Fixes
+
+- **Filter buttons now work correctly**: Clicking `🔴 HIGH`, `🟠 MED`, or `🔵 LOW` in the tool window now shows only findings at that severity level. Previously the buttons started in a "selected" state and toggling them *hid* results instead — the logic was inverted. Buttons now start inactive (show all), and pressing one filters *to* that level. Multiple buttons can be pressed together to show any combination.
+- **LOW severity color**: Risk-level text for `LOW` findings in the results table was rendered in blue, making it visually identical to links. It is now displayed in gray for clear distinction from `HIGH` (red) and `MEDIUM` (orange).
+- **HTTP URL detection in `maven {}` blocks**: Plain `http://` repository URLs inside `maven { url = ... }` declarations were silently skipped and never flagged as MITM risks. The check now runs on all lines; legitimate HTTPS repository domains continue to be suppressed via the built-in whitelist.
+- **Plugin detection for Kotlin DSL syntax**: `id("com.example.plugin")` declarations were not detected by `PluginInjectionCheck`. The regex only handled Groovy-style `id 'plugin'` and `id "plugin"` forms. The pattern now correctly parses the parenthesised Kotlin form `id("…")`.
+- **`checkId` lost on disk cache round-trip**: `SafeGradleScanCache` stored violations without their `checkId` field. On the next IDE startup the field defaulted to `"unknown"`, breaking suppression entries and baseline matching that relied on the check identifier. The field is now persisted and restored correctly.
+- **`VulnerabilityCheck` violations missing `checkId`**: All six `SecurityViolation` constructors inside `VulnerabilityCheck` (static CVE, dynamic version, version range, `resolutionStrategy.force`, OSV advisory) omitted `checkId`. Suppressions targeting `dependency_vulnerability` now work as expected.
+- **Comment stripping inside string literals**: `SecurityUtils.stripComments()` used a naive `indexOf("//")` approach that truncated URLs in string literals — e.g. `"https://example.com"` was cut to `"https:`. Replaced with a state-machine parser that tracks open string delimiters (`"` and `'`) and only strips `//` sequences that appear outside of strings.
+- **YAML config section header parsing**: Section keys in `.safegradle.yml` (`whitelist_domains:`, `suppressions:`, etc.) were matched against the raw unindented line. Files with leading whitespace on section headers were silently ignored. Detection now uses the already-trimmed line so indented YAML is parsed correctly.
+- **"Group by Check" column header**: When the *Group by Check* toggle was active, the first column of the results table still showed the label **File** instead of **Check**. The header now updates dynamically when the toggle changes.
+
 ## [0.0.35]
 
 ### 🛡️ 17 New Security Checks

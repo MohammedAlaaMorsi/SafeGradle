@@ -86,4 +86,54 @@ class SecurityScannerTest : BasePlatformTestCase() {
         assertTrue(violations.any { it.message.contains("setSecurityManager") })
         assertTrue(violations.any { it.message.contains("URLClassLoader") })
     }
+
+    fun `test scanner respects disabled check in settings`() {
+        val scanner = SecurityScanner()
+        val code = """Runtime.getRuntime().exec("whoami")"""
+        val file = myFixture.configureByText("build.gradle", code)
+        
+        val settings = SafeGradleSettings.getInstance(project).state
+        settings.enabledChecks["shell_execution"] = false
+
+        try {
+            val violations = scanner.scanSingleFile(file.virtualFile, project, null)
+            assertTrue(violations.none { it.checkId == "shell_execution" })
+        } finally {
+            settings.enabledChecks.remove("shell_execution")
+        }
+    }
+
+    fun `test scanner respects severity override in settings`() {
+        val scanner = SecurityScanner()
+        val code = """Runtime.getRuntime().exec("whoami")"""
+        val file = myFixture.configureByText("build.gradle", code)
+        
+        val settings = SafeGradleSettings.getInstance(project).state
+        settings.severityOverrides["shell_execution"] = "LOW"
+
+        try {
+            val violations = scanner.scanSingleFile(file.virtualFile, project, null)
+            val shellViolation = violations.firstOrNull { it.checkId == "shell_execution" }
+            assertNotNull(shellViolation)
+            assertEquals(RiskLevel.LOW, shellViolation!!.riskLevel)
+        } finally {
+            settings.severityOverrides.remove("shell_execution")
+        }
+    }
+
+    fun `test scanner respects disabled severity override in settings`() {
+        val scanner = SecurityScanner()
+        val code = """Runtime.getRuntime().exec("whoami")"""
+        val file = myFixture.configureByText("build.gradle", code)
+        
+        val settings = SafeGradleSettings.getInstance(project).state
+        settings.severityOverrides["shell_execution"] = "DISABLED"
+
+        try {
+            val violations = scanner.scanSingleFile(file.virtualFile, project, null)
+            assertTrue(violations.none { it.checkId == "shell_execution" })
+        } finally {
+            settings.severityOverrides.remove("shell_execution")
+        }
+    }
 }

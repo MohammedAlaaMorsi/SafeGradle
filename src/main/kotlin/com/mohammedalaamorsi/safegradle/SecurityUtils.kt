@@ -1,18 +1,24 @@
 package com.mohammedalaamorsi.safegradle
 
 object SecurityUtils {
-    /**
-     * Strips single-line comments from a line.
-     * Note: This is a simple implementation and doesn't handle strings containing // correctly.
-     * In a full implementation, we'd use a lexer or more complex regex.
-     */
     fun stripComments(line: String): String {
-        val commentIndex = line.indexOf("//")
-        return if (commentIndex >= 0) {
-            line.substring(0, commentIndex)
-        } else {
-            line
+        var inString = false
+        var stringChar = ' '
+        var i = 0
+        while (i < line.length) {
+            val c = line[i]
+            if (inString) {
+                if (c == '\\') { i += 2; continue }
+                if (c == stringChar) inString = false
+            } else {
+                if (c == '"' || c == '\'') { inString = true; stringChar = c }
+                else if (c == '/' && i + 1 < line.length && line[i + 1] == '/') {
+                    return line.substring(0, i)
+                }
+            }
+            i++
         }
+        return line
     }
 
     /**
@@ -26,5 +32,18 @@ object SecurityUtils {
                 trimmed.startsWith("buildscript") ||
                 trimmed.startsWith("allprojects") ||
                 trimmed.startsWith("subprojects")
+    }
+
+    fun levenshtein(s1: String, s2: String): Int {
+        val dp = Array(s1.length + 1) { IntArray(s2.length + 1) }
+        for (i in 0..s1.length) dp[i][0] = i
+        for (j in 0..s2.length) dp[0][j] = j
+        for (i in 1..s1.length) {
+            for (j in 1..s2.length) {
+                val cost = if (s1[i - 1] == s2[j - 1]) 0 else 1
+                dp[i][j] = minOf(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + cost)
+            }
+        }
+        return dp[s1.length][s2.length]
     }
 }

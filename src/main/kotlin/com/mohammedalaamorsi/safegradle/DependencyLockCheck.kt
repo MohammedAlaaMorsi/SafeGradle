@@ -15,17 +15,40 @@ class DependencyLockCheck : SecurityCheck {
     )
 
     override fun check(file: VirtualFile, content: String, project: Project?, teamConfig: YamlConfig?): List<SecurityViolation> {
-        // Only run on the root build file — avoid duplicate warnings from every module
+        // Inspect lockfile health if this is a lockfile
+        if (file.name == "gradle.lockfile" || file.name.endsWith(".lockfile")) {
+            val nonCommentLines = content.lines().filter { 
+                val t = it.trim()
+                t.isNotEmpty() && !t.startsWith("#") && !t.startsWith("//") && t != "empty=" 
+            }
+            if (nonCommentLines.isEmpty()) {
+                return listOf(
+                    SecurityViolation(
+                        file = file,
+                        line = 1,
+                        content = file.name,
+                        message = "Lockfile '${file.name}' contains no locked dependencies. " +
+                                "Run './gradlew dependencies --write-locks' to generate locked dependencies.",
+                        riskLevel = RiskLevel.LOW,
+                        checkId = id
+                    )
+                )
+            }
+            return emptyList()
+        }
+
+        // Only run root-check on root build file — avoid duplicate warnings from every module
         if (file.name != "build.gradle" && file.name != "build.gradle.kts") return emptyList()
         if (!isRootBuildFile(file, project)) return emptyList()
 
         // If any build file in the project already has dependencyLocking configured, don't warn
         if (dependencyLockingPattern.matcher(content).find()) return emptyList()
 
-        // Check if a gradle/dependency-locks/ directory exists
+        // Check if gradle.lockfile or a gradle/dependency-locks/ directory exists
         val projectBase = file.parent ?: return emptyList()
+        if (projectBase.findChild("gradle.lockfile") != null) return emptyList()
         val gradleDir = projectBase.findChild("gradle")
-        if (gradleDir != null && gradleDir.findChild("dependency-locks") != null) return emptyList()
+        if (gradleDir != null && (gradleDir.findChild("dependency-locks") != null || gradleDir.findChild("gradle.lockfile") != null)) return emptyList()
 
         return listOf(
             SecurityViolation(
@@ -45,3 +68,4 @@ class DependencyLockCheck : SecurityCheck {
         return file.parent?.path == projectBase || file.parent?.parent?.path == projectBase
     }
 }
+

@@ -48,9 +48,9 @@ class SafeGradleStatusBarWidget(private val project: Project) :
     }
 
     override fun getText(): String = when {
-        high + medium + low == 0 -> "SafeGradle ✓"
+        high + medium + low == 0 -> "SafeGradle A ✓"
         else -> buildString {
-            append("SafeGradle")
+            append("SafeGradle ${SecurityScore.grade(high, medium, low)}")
             if (high > 0) append(" 🔴$high")
             if (medium > 0) append(" 🟠$medium")
             if (low > 0) append(" 🔵$low")
@@ -58,8 +58,8 @@ class SafeGradleStatusBarWidget(private val project: Project) :
     }
 
     override fun getTooltipText(): String = when {
-        high + medium + low == 0 -> "SafeGradle: No security issues found"
-        else -> "SafeGradle: $high HIGH, $medium MEDIUM, $low LOW — click to open"
+        high + medium + low == 0 -> "SafeGradle: No security issues found. ${SecurityScore.FORMULA}"
+        else -> "SafeGradle: $high HIGH, $medium MEDIUM, $low LOW — click to open. ${SecurityScore.FORMULA}"
     }
 
     override fun getClickConsumer(): Consumer<MouseEvent> = Consumer {

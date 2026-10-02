@@ -12,7 +12,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.Future
 
 class SecurityScanner(extraChecks: List<SecurityCheck> = emptyList()) {
-    private val checks = listOf(
+    val checks = listOf(
         ShellExecutionCheck(),
         NetworkActivityCheck(),
         SensitiveFileCheck(),
@@ -28,7 +28,11 @@ class SecurityScanner(extraChecks: List<SecurityCheck> = emptyList()) {
         ApplyFromCheck(),
         JvmArgsCheck(),
         WeakCryptoCheck(),
-        DependencyLockCheck()
+        DependencyLockCheck(),
+        BuildCacheCheck(),
+        PluginPortalCheck(),
+        DependencyVerificationCheck(),
+        LicenseCheck()
     ) + extraChecks
 
     fun scanProject(project: Project): Map<VirtualFile, List<SecurityViolation>> {
@@ -142,6 +146,7 @@ class SecurityScanner(extraChecks: List<SecurityCheck> = emptyList()) {
             "gradle.properties", "gradle-wrapper.jar",
             "gradle-wrapper.properties",
             "libs.versions.toml",
+            "verification-metadata.xml",
             ".gitignore"
         )
 
@@ -201,6 +206,7 @@ class SecurityScanner(extraChecks: List<SecurityCheck> = emptyList()) {
         }
 
         for (check in checks) {
+            if (settings?.enabledChecks?.get(check.id) == false) continue
             val rawViolations = mutableListOf<SecurityViolation>()
             rawViolations.addAll(check.check(file, content, project, teamConfig))
             if (psiFile != null) {
@@ -209,11 +215,20 @@ class SecurityScanner(extraChecks: List<SecurityCheck> = emptyList()) {
                 }
             }
 
+            // Checks that don't set checkId would otherwise escape overrides/suppressions
+            rawViolations.replaceAll { if (it.checkId == "unknown") it.copy(checkId = check.id) else it }
+
             val overridden = if (teamConfig != null && teamConfig.severityOverrides.containsKey(check.id)) {
                 val override = teamConfig.severityOverrides[check.id]
                 if (override == null) emptyList() else rawViolations.map { it.copy(riskLevel = override) }
             } else {
-                rawViolations
+                when (val local = settings?.severityOverrides?.get(check.id)) {
+                    null -> rawViolations
+                    "DISABLED" -> emptyList()
+                    else -> RiskLevel.entries.firstOrNull { it.name == local }
+                        ?.let { level -> rawViolations.map { it.copy(riskLevel = level) } }
+                        ?: rawViolations
+                }
             }
 
             val filtered = overridden.filter { violation ->

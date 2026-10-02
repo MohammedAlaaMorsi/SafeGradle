@@ -22,7 +22,8 @@ class SafeGradleScanCache : PersistentStateComponent<SafeGradleScanCache.State> 
         var content: String = "",
         var message: String = "",
         var riskLevel: String = "",
-        var checkId: String = ""
+        var checkId: String = "",
+        var fixVersion: String = ""
     )
 
     private var myState = State()
@@ -36,16 +37,21 @@ class SafeGradleScanCache : PersistentStateComponent<SafeGradleScanCache.State> 
         val entry = myState.cacheEntries[file.path] ?: return null
         if (entry.hash != file.modificationCount.toString()) return null
         
-        return entry.violations.map { 
+        return entry.violations.map {
             SecurityViolation(
                 file = file,
                 line = it.line,
                 content = it.content,
                 message = it.message,
-                riskLevel = RiskLevel.valueOf(it.riskLevel)
+                riskLevel = RiskLevel.valueOf(it.riskLevel),
+                checkId = it.checkId,
+                fixVersion = it.fixVersion.ifEmpty { null }
             )
         }
     }
+
+    /** Drops every entry — needed when rule settings change, since entries are keyed on file content only. */
+    fun clear() = myState.cacheEntries.clear()
 
     fun invalidate(file: VirtualFile) {
         myState.cacheEntries.remove(file.path)
@@ -54,12 +60,14 @@ class SafeGradleScanCache : PersistentStateComponent<SafeGradleScanCache.State> 
     fun updateCache(file: VirtualFile, violations: List<SecurityViolation>) {
         val entry = CacheEntry(
             hash = file.modificationCount.toString(),
-            violations = violations.map { 
+            violations = violations.map {
                 CachedViolation(
                     line = it.line,
                     content = it.content,
                     message = it.message,
-                    riskLevel = it.riskLevel.name
+                    riskLevel = it.riskLevel.name,
+                    checkId = it.checkId,
+                    fixVersion = it.fixVersion ?: ""
                 )
             }
         )

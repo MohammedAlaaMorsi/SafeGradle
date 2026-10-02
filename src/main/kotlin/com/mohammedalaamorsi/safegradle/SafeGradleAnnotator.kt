@@ -14,7 +14,9 @@ class SafeGradleAnnotator : ExternalAnnotator<PsiFile, List<SecurityViolation>>(
 
     override fun collectInformation(file: PsiFile, editor: Editor, hasErrors: Boolean): PsiFile? {
         val fileName = file.name
-        if (fileName.endsWith(".gradle") || fileName.endsWith(".gradle.kts") || fileName == "gradle.properties") {
+        if (fileName.endsWith(".gradle") || fileName.endsWith(".gradle.kts") ||
+            fileName == "gradle.properties" || fileName == "gradle-wrapper.properties" ||
+            fileName == "libs.versions.toml" || fileName.endsWith(".lockfile")) {
             return file
         }
         return null
@@ -64,3 +66,4 @@ class SafeGradleAnnotator : ExternalAnnotator<PsiFile, List<SecurityViolation>>(
         }
     }
 }
+

@@ -14,6 +14,7 @@ import com.intellij.ui.components.JBTextArea
 import com.intellij.ui.content.ContentFactory
 import com.intellij.ui.table.JBTable
 import java.awt.*
+import java.awt.datatransfer.StringSelection
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import java.io.File
@@ -49,6 +50,7 @@ class SafeGradleToolWindowFactory : ToolWindowFactory, DumbAware {
         private val headerLabel = JLabel("Scan a project to see results here.")
         private val exportButton = JButton("Export Results")
         private val saveBaselineButton = JButton("Save Baseline")
+        private val fixAllButton = JButton("Fix All")
         private val newOnlyToggle = JToggleButton("New Only", false)
         private val groupByCheckToggle = JToggleButton("Group by Check", false)
 
@@ -59,9 +61,8 @@ class SafeGradleToolWindowFactory : ToolWindowFactory, DumbAware {
 
         // Filter controls
         private val searchField = JTextField(20)
-        private val showHighToggle = JToggleButton("🔴 HIGH", true)
-        private val showMediumToggle = JToggleButton("🟠 MED", true)
-        private val showLowToggle = JToggleButton("🔵 LOW", true)
+        // Single severity filter driven by the summary chips; null = show all
+        private var severityFilter: RiskLevel? = null
 
         init {
             project.messageBus.connect().subscribe(SafeGradleResultService.TOPIC, this)
@@ -75,9 +76,10 @@ class SafeGradleToolWindowFactory : ToolWindowFactory, DumbAware {
             mediumCountLabel.font = labelFont
             lowCountLabel.font = labelFont
 
-            highCountLabel.border = EmptyBorder(5, 5, 5, 15)
-            mediumCountLabel.border = EmptyBorder(5, 5, 5, 15)
-            lowCountLabel.border = EmptyBorder(5, 5, 5, 15)
+            // The summary labels are the severity filter: click one to show only it, click again to clear.
+            makeSeverityChip(highCountLabel, RiskLevel.HIGH)
+            makeSeverityChip(mediumCountLabel, RiskLevel.MEDIUM)
+            makeSeverityChip(lowCountLabel, RiskLevel.LOW)
 
             summaryPanel.add(highCountLabel)
             summaryPanel.add(mediumCountLabel)
@@ -87,7 +89,7 @@ class SafeGradleToolWindowFactory : ToolWindowFactory, DumbAware {
             exportButton.font = headerLabel.font.deriveFont(Font.BOLD, 14f)
             exportButton.preferredSize = Dimension(150, 40)
             exportButton.addActionListener {
-                val formats = arrayOf("CSV (.csv)", "JSON (.json)", "SARIF (.sarif) — GitHub Code Scanning")
+                val formats = arrayOf("CSV (.csv)", "JSON (.json)", "SARIF (.sarif) — GitHub Code Scanning", "HTML (.html) — shareable report")
                 @Suppress("DEPRECATION")
                 val choice = Messages.showChooseDialog(
                     "Choose export format:", "Export Report",
@@ -98,6 +100,7 @@ class SafeGradleToolWindowFactory : ToolWindowFactory, DumbAware {
                     val defaultName = when (choice) {
                         1 -> "safegradle_report.json"
                         2 -> "safegradle_report.sarif"
+                        3 -> "safegradle_report.html"
                         else -> "safegradle_report.csv"
                     }
                     val path = Messages.showInputDialog(project, "Enter file name:", "Export Report", null, defaultName, null)
@@ -106,6 +109,7 @@ class SafeGradleToolWindowFactory : ToolWindowFactory, DumbAware {
                         when (choice) {
                             1 -> ReportExporter.exportToJson(currentViolations, file)
                             2 -> ReportExporter.exportToSarif(currentViolations, file)
+                            3 -> ReportExporter.exportToHtml(currentViolations, file)
                             else -> ReportExporter.exportToCsv(currentViolations, file)
                         }
                         Messages.showInfoMessage(project, "Report exported to ${file.absolutePath}", "Export Successful")
@@ -113,6 +117,11 @@ class SafeGradleToolWindowFactory : ToolWindowFactory, DumbAware {
                 }
             }
             summaryPanel.add(exportButton)
+
+            fixAllButton.isVisible = false
+            fixAllButton.toolTipText = "Apply every safe automatic fix (HTTPS, jcenter → mavenCentral, wrapper checksum, dependency upgrades). Undo with Ctrl+Z."
+            fixAllButton.addActionListener { fixAll() }
+            summaryPanel.add(fixAllButton)
 
             saveBaselineButton.isVisible = false
             saveBaselineButton.toolTipText = "Save current results as baseline — only NEW violations will be shown on future scans"
@@ -139,9 +148,6 @@ class SafeGradleToolWindowFactory : ToolWindowFactory, DumbAware {
             val filterPanel = JPanel(FlowLayout(FlowLayout.LEFT, 8, 4))
             filterPanel.add(JLabel("Filter:"))
             filterPanel.add(searchField)
-            filterPanel.add(showHighToggle)
-            filterPanel.add(showMediumToggle)
-            filterPanel.add(showLowToggle)
             filterPanel.border = BorderFactory.createMatteBorder(0, 0, 1, 0, Color.LIGHT_GRAY)
 
             val filterListener = { _: Any -> applyFilter() }
@@ -150,9 +156,6 @@ class SafeGradleToolWindowFactory : ToolWindowFactory, DumbAware {
                 override fun removeUpdate(e: javax.swing.event.DocumentEvent) = filterListener(e)
                 override fun changedUpdate(e: javax.swing.event.DocumentEvent) = filterListener(e)
             })
-            showHighToggle.addActionListener { applyFilter() }
-            showMediumToggle.addActionListener { applyFilter() }
-            showLowToggle.addActionListener { applyFilter() }
 
             val northWrapper = JPanel(BorderLayout())
             northWrapper.add(topPanel, BorderLayout.NORTH)
@@ -162,36 +165,23 @@ class SafeGradleToolWindowFactory : ToolWindowFactory, DumbAware {
             val columnNames = arrayOf("File", "Line", "Risk", "Message")
             tableModel = object : DefaultTableModel(columnNames, 0) {
                 override fun isCellEditable(row: Int, column: Int): Boolean = false
+                // Correct column classes so the sorter compares lines numerically
+                // and risk by severity (enum order LOW < MEDIUM < HIGH) instead of by toString().
+                override fun getColumnClass(columnIndex: Int): Class<*> = when (columnIndex) {
+                    1 -> java.lang.Integer::class.java
+                    2 -> RiskLevel::class.java
+                    else -> String::class.java
+                }
             }
             table = JBTable(tableModel)
             rowSorter = TableRowSorter(tableModel)
             table.rowSorter = rowSorter
-
-            table.columnModel.getColumn(2).cellRenderer = object : DefaultTableCellRenderer() {
-                override fun getTableCellRendererComponent(
-                    table: JTable?, value: Any?, isSelected: Boolean, hasFocus: Boolean, row: Int, column: Int
-                ): Component {
-                    val c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column)
-                    if (value is RiskLevel) {
-                        foreground = when (value) {
-                            RiskLevel.HIGH -> Color.RED
-                            RiskLevel.MEDIUM -> Color.ORANGE
-                            RiskLevel.LOW -> Color.BLUE
-                        }
-                    }
-                    return c
-                }
-            }
+            installRiskRenderer()
 
             table.addMouseListener(object : MouseAdapter() {
                 override fun mouseClicked(e: MouseEvent) {
                     if (e.clickCount == 2) {
-                        val modelRow = table.convertRowIndexToModel(table.selectedRow)
-                        if (modelRow >= 0 && modelRow < flatViolations.size) {
-                            val violation = flatViolations[modelRow]
-                            val descriptor = OpenFileDescriptor(project, violation.file, violation.line - 1, 0)
-                            FileEditorManager.getInstance(project).openTextEditor(descriptor, true)
-                        }
+                        openSelectedViolation()
                     }
                 }
             })
@@ -210,14 +200,10 @@ class SafeGradleToolWindowFactory : ToolWindowFactory, DumbAware {
                 preferredSize = Dimension(0, 110)
             }
 
-            table.selectionModel.addListSelectionListener {
-                val modelRow = if (table.selectedRow >= 0) table.convertRowIndexToModel(table.selectedRow) else -1
-                val violation = flatViolations.getOrNull(modelRow)
+            table.selectionModel.addListSelectionListener { e ->
+                if (e.valueIsAdjusting) return@addListSelectionListener
+                val violation = selectedViolation()
                 if (violation != null) {
-                    val check = SecurityScanner().let { s ->
-                        // Find the check by matching its id to the violation's checkId
-                        null // description lookup is in the check classes; embed it in the violation message
-                    }
                     detailArea.text = buildString {
                         append("[${violation.riskLevel}] ${violation.file.name}:${violation.line}\n\n")
                         append(violation.message)
@@ -229,6 +215,8 @@ class SafeGradleToolWindowFactory : ToolWindowFactory, DumbAware {
                     detailArea.text = ""
                 }
             }
+
+            installContextMenu()
 
             val splitPane = javax.swing.JSplitPane(
                 javax.swing.JSplitPane.VERTICAL_SPLIT,
@@ -243,28 +231,23 @@ class SafeGradleToolWindowFactory : ToolWindowFactory, DumbAware {
 
         private fun applyFilter() {
             val baseline = if (newOnlyToggle.isSelected) SafeGradleBaseline.load(project) else emptySet()
-            val text = searchField.text.trim()
+            val text = searchField.text
+            val highOn = severityFilter == RiskLevel.HIGH
+            val medOn  = severityFilter == RiskLevel.MEDIUM
+            val lowOn  = severityFilter == RiskLevel.LOW
 
-            val allowedLevels = mutableSetOf<String>()
-            if (showHighToggle.isSelected) allowedLevels.add("HIGH")
-            if (showMediumToggle.isSelected) allowedLevels.add("MEDIUM")
-            if (showLowToggle.isSelected) allowedLevels.add("LOW")
+            syncSeverityChips()
 
             rowSorter.rowFilter = object : RowFilter<DefaultTableModel, Int>() {
                 override fun include(entry: Entry<out DefaultTableModel, out Int>): Boolean {
-                    val modelRow = entry.identifier
-                    val violation = flatViolations.getOrNull(modelRow) ?: return false
+                    val risk = entry.getValue(2) as? RiskLevel
+                    val rowText = (0 until entry.valueCount).joinToString(" ") { entry.getStringValue(it) }
+                    if (!ViolationRowMatcher.matches(risk, highOn, medOn, lowOn, text, rowText)) return false
 
                     // Baseline filter
-                    if (baseline.isNotEmpty() && !SafeGradleBaseline.isNew(violation, baseline)) return false
-
-                    // Risk level filter
-                    if (violation.riskLevel.name !in allowedLevels) return false
-
-                    // Text search filter
-                    if (text.isNotEmpty()) {
-                        val haystack = "${violation.file.name} ${violation.message} ${violation.riskLevel}".lowercase()
-                        if (!haystack.contains(text.lowercase())) return false
+                    if (baseline.isNotEmpty()) {
+                        val violation = flatViolations.getOrNull(entry.identifier) ?: return false
+                        if (!SafeGradleBaseline.isNew(violation, baseline)) return false
                     }
 
                     return true
@@ -272,16 +255,263 @@ class SafeGradleToolWindowFactory : ToolWindowFactory, DumbAware {
             }
         }
 
+        /** Highlights the chip matching the active severity filter. */
+        private fun syncSeverityChips() {
+            for ((label, level) in listOf(
+                highCountLabel to RiskLevel.HIGH,
+                mediumCountLabel to RiskLevel.MEDIUM,
+                lowCountLabel to RiskLevel.LOW
+            )) {
+                val selected = severityFilter == level
+                label.isOpaque = selected
+                label.background = if (selected) UIManager.getColor("List.selectionBackground") else null
+                label.repaint()
+            }
+        }
+
+        /** Makes a summary count label a clickable filter chip for [level]. */
+        private fun makeSeverityChip(label: JLabel, level: RiskLevel) {
+            label.border = EmptyBorder(5, 5, 5, 15)
+            label.cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
+            label.toolTipText = "Click to show only $level violations; click again to show all"
+            label.addMouseListener(object : MouseAdapter() {
+                // mousePressed, not mouseClicked: a click with slight mouse movement never fires mouseClicked
+                override fun mousePressed(e: MouseEvent) {
+                    if (!SwingUtilities.isLeftMouseButton(e)) return
+                    severityFilter = if (severityFilter == level) null else level
+                    applyFilter()
+                }
+            })
+        }
+
+        /** Re-installs the Risk column renderer; needed after every table structure change. */
+        private fun installRiskRenderer() {
+            table.columnModel.getColumn(2).cellRenderer = object : DefaultTableCellRenderer() {
+                override fun getTableCellRendererComponent(
+                    table: JTable?, value: Any?, isSelected: Boolean, hasFocus: Boolean, row: Int, column: Int
+                ): Component {
+                    val c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column)
+                    if (value is RiskLevel) {
+                        foreground = when (value) {
+                            RiskLevel.HIGH -> Color.RED
+                            RiskLevel.MEDIUM -> Color.ORANGE
+                            RiskLevel.LOW -> Color(130, 130, 130)
+                        }
+                    }
+                    return c
+                }
+            }
+        }
+
+        private fun selectedViolation(): SecurityViolation? {
+            val viewRow = table.selectedRow
+            if (viewRow < 0) return null
+            return flatViolations.getOrNull(table.convertRowIndexToModel(viewRow))
+        }
+
+        private fun openSelectedViolation() {
+            val violation = selectedViolation() ?: return
+            val descriptor = OpenFileDescriptor(project, violation.file, violation.line - 1, 0)
+            FileEditorManager.getInstance(project).openTextEditor(descriptor, true)
+        }
+
+        /** Right-click menu on result rows: navigate, copy details, upgrade, suppress. */
+        private fun installContextMenu() {
+            val menu = JPopupMenu()
+            menu.add(JMenuItem("Jump to Source").apply {
+                addActionListener { openSelectedViolation() }
+            })
+            val upgradeItem = JMenuItem("Upgrade to Fixed Version").apply {
+                addActionListener { upgradeSelectedViolation() }
+            }
+            menu.add(upgradeItem)
+            menu.addPopupMenuListener(object : javax.swing.event.PopupMenuListener {
+                override fun popupMenuWillBecomeVisible(e: javax.swing.event.PopupMenuEvent) {
+                    val v = selectedViolation()
+                    val fix = v?.fixVersion
+                    val isWrapper = (v?.checkId == "gradle_wrapper_integrity" || v?.file?.name == "gradle-wrapper.properties") && fix != null
+                    upgradeItem.isEnabled = fix != null
+                    upgradeItem.text = when {
+                        isWrapper -> "Add Official Checksum (${fix!!.take(8)}...)"
+                        fix != null -> "Upgrade to Fixed Version ($fix)"
+                        else -> "Upgrade to Fixed Version"
+                    }
+                }
+                override fun popupMenuWillBecomeInvisible(e: javax.swing.event.PopupMenuEvent) {}
+                override fun popupMenuCanceled(e: javax.swing.event.PopupMenuEvent) {}
+            })
+            menu.add(JMenuItem("Copy Violation Details").apply {
+                addActionListener {
+                    val v = selectedViolation() ?: return@addActionListener
+                    val details = "[${v.riskLevel}] ${v.file.path}:${v.line} — ${v.message}\n${v.content}"
+                    Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(details), null)
+                }
+            })
+            menu.add(JMenuItem("Suppress (add // safegradle:ignore)").apply {
+                addActionListener { suppressSelectedViolation() }
+            })
+            table.componentPopupMenu = menu
+            // Make right-click select the row under the cursor before the menu opens.
+            table.addMouseListener(object : MouseAdapter() {
+                override fun mousePressed(e: MouseEvent) {
+                    if (SwingUtilities.isRightMouseButton(e)) {
+                        val row = table.rowAtPoint(e.point)
+                        if (row >= 0) table.setRowSelectionInterval(row, row)
+                    }
+                }
+            })
+        }
+
+        /** Rewrites the dependency's version to the known fixed version, saves, and rescans the file. */
+        private fun upgradeSelectedViolation() {
+            val violation = selectedViolation() ?: return
+            val fix = violation.fixVersion ?: return
+            val fileDocManager = com.intellij.openapi.fileEditor.FileDocumentManager.getInstance()
+            val document = fileDocManager.getDocument(violation.file) ?: return
+
+            if (violation.checkId == "gradle_wrapper_integrity" || violation.file.name == "gradle-wrapper.properties") {
+                applyWrapperChecksumFix(violation, fix, document)
+                return
+            }
+
+            val lineIndex = violation.line - 1
+            if (lineIndex < 0 || lineIndex >= document.lineCount) return
+            val start = document.getLineStartOffset(lineIndex)
+            val end = document.getLineEndOffset(lineIndex)
+            val upgraded = DependencyUpgrader.upgradeLine(document.getText(com.intellij.openapi.util.TextRange(start, end)), fix)
+            if (upgraded == null) {
+                Messages.showInfoMessage(
+                    project,
+                    "This dependency uses an indirect or interpolated version — update it manually to $fix.",
+                    "Cannot Upgrade Automatically"
+                )
+                return
+            }
+            com.intellij.openapi.command.WriteCommandAction.runWriteCommandAction(project) {
+                document.replaceString(start, end, upgraded)
+                fileDocManager.saveDocument(document)
+            }
+            com.intellij.openapi.application.ApplicationManager.getApplication().executeOnPooledThread {
+                val merged = IncrementalScan.rescanFiles(project, listOf(violation.file))
+                com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater {
+                    SafeGradleResultService.getInstance(project).setResults(merged)
+                }
+            }
+        }
+
+        private fun applyWrapperChecksumFix(violation: SecurityViolation, checksum: String, document: com.intellij.openapi.editor.Document) {
+            val fileDocManager = com.intellij.openapi.fileEditor.FileDocumentManager.getInstance()
+            com.intellij.openapi.command.WriteCommandAction.runWriteCommandAction(project) {
+                document.setText(BatchQuickFixEngine.fixWrapper(document.text, checksum))
+                fileDocManager.saveDocument(document)
+            }
+
+            Messages.showInfoMessage(project, "Added official distributionSha256Sum to gradle-wrapper.properties.", "SafeGradle")
+            com.intellij.openapi.application.ApplicationManager.getApplication().executeOnPooledThread {
+                val merged = IncrementalScan.rescanFiles(project, listOf(violation.file))
+                com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater {
+                    SafeGradleResultService.getInstance(project).setResults(merged)
+                }
+            }
+        }
+
+        /**
+         * Applies every safe automatic fix in one undoable command, then rescans the touched files.
+         * Violations on the same line are applied in sequence so e.g. HTTPS + version upgrade both land.
+         */
+        private fun fixAll() {
+            val fixable = currentViolations.values.flatten().filter { BatchQuickFixEngine.isFixable(it) }
+            if (fixable.isEmpty()) {
+                Messages.showInfoMessage(project, "None of the current findings have a safe automatic fix.", "SafeGradle")
+                return
+            }
+            val files = fixable.map { it.file }.distinct()
+            val answer = Messages.showYesNoDialog(
+                project,
+                "Apply ${fixable.size} automatic fix(es) across ${files.size} file(s)?\n\n" +
+                    "HTTP → HTTPS assumes the host serves HTTPS — check internal repositories after applying.\n" +
+                    "All changes can be reverted with a single Undo (Ctrl+Z / Cmd+Z).",
+                "SafeGradle: Fix All", Messages.getQuestionIcon()
+            )
+            if (answer != Messages.YES) return
+
+            val fileDocManager = com.intellij.openapi.fileEditor.FileDocumentManager.getInstance()
+            var applied = 0
+            com.intellij.openapi.command.WriteCommandAction.writeCommandAction(project)
+                .withName("SafeGradle: Fix All")
+                .withGlobalUndo()
+                .run<RuntimeException> {
+                    for ((file, violations) in fixable.groupBy { it.file }) {
+                        val document = fileDocManager.getDocument(file) ?: continue
+                        if (file.name == BatchQuickFixEngine.WRAPPER_FILE) {
+                            val checksum = violations.first().fixVersion ?: continue
+                            document.setText(BatchQuickFixEngine.fixWrapper(document.text, checksum))
+                            applied += violations.size
+                        } else {
+                            for ((line, onLine) in violations.groupBy { it.line }) {
+                                val idx = line - 1
+                                if (idx < 0 || idx >= document.lineCount) continue
+                                val range = com.intellij.openapi.util.TextRange(document.getLineStartOffset(idx), document.getLineEndOffset(idx))
+                                val original = document.getText(range)
+                                val fixed = onLine.fold(original) { text, v ->
+                                    BatchQuickFixEngine.fixLine(v.checkId, v.message, v.fixVersion, text)?.also { applied++ } ?: text
+                                }
+                                if (fixed != original) document.replaceString(range.startOffset, range.endOffset, fixed)
+                            }
+                        }
+                        fileDocManager.saveDocument(document)
+                    }
+                }
+
+            com.intellij.openapi.application.ApplicationManager.getApplication().executeOnPooledThread {
+                val merged = IncrementalScan.rescanFiles(project, files)
+                com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater {
+                    SafeGradleResultService.getInstance(project).setResults(merged)
+                    Messages.showInfoMessage(project, "Applied $applied fix(es). Press Ctrl+Z / Cmd+Z in an edited file to undo.", "SafeGradle: Fix All")
+                }
+            }
+        }
+
+        /** Appends `// safegradle:ignore` to the violation's line and rescans that file's row out of view. */
+        private fun suppressSelectedViolation() {
+            val violation = selectedViolation() ?: return
+            val document = com.intellij.openapi.fileEditor.FileDocumentManager.getInstance()
+                .getDocument(violation.file) ?: return
+            val lineIndex = violation.line - 1
+            if (lineIndex < 0 || lineIndex >= document.lineCount) return
+            val lineEnd = document.getLineEndOffset(lineIndex)
+            val lineText = document.getText(
+                com.intellij.openapi.util.TextRange(document.getLineStartOffset(lineIndex), lineEnd)
+            )
+            if (lineText.contains("safegradle:ignore")) return
+            com.intellij.openapi.command.WriteCommandAction.runWriteCommandAction(project) {
+                document.insertString(lineEnd, " // safegradle:ignore")
+            }
+            // Drop the suppressed violation from the current view immediately.
+            val updated = currentViolations.mapValues { (_, list) -> list.filterNot { it === violation } }
+                .filterValues { it.isNotEmpty() }
+            SafeGradleResultService.getInstance(project).setResults(updated)
+        }
+
         override fun onResultsUpdated(violations: Map<VirtualFile, List<SecurityViolation>>) {
             updateResults(violations)
         }
 
         private fun rebuildTable() {
+            // setColumnIdentifiers fires a structure change: JTable recreates its columns,
+            // dropping the Risk renderer and the sort keys — both must be restored afterwards.
+            tableModel.setColumnIdentifiers(
+                if (groupByCheckToggle.isSelected) arrayOf("Check", "Line", "Risk", "Message")
+                else arrayOf("File", "Line", "Risk", "Message")
+            )
+            installRiskRenderer()
+            rowSorter.sortKeys = listOf(RowSorter.SortKey(2, SortOrder.DESCENDING))
+
             tableModel.rowCount = 0
             flatViolations.clear()
             val orderedViolations = if (groupByCheckToggle.isSelected) {
                 currentViolations.values.flatten()
-                    .sortedWith(compareBy({ it.checkId }, { it.riskLevel.ordinal.unaryMinus() }))
+                    .sortedWith(compareBy({ it.checkId }, { -it.riskLevel.ordinal }))
             } else {
                 currentViolations.entries.flatMap { (_, list) -> list }
             }
@@ -295,32 +525,19 @@ class SafeGradleToolWindowFactory : ToolWindowFactory, DumbAware {
 
         fun updateResults(violations: Map<VirtualFile, List<SecurityViolation>>) {
             currentViolations = violations
-            tableModel.rowCount = 0
-            flatViolations.clear()
+            rebuildTable()
 
-            var high = 0
-            var medium = 0
-            var low = 0
-
-            violations.forEach { (file, list) ->
-                list.forEach { violation ->
-                    flatViolations.add(violation)
-                    tableModel.addRow(arrayOf<Any>(
-                        file.name,
-                        violation.line,
-                        violation.riskLevel,
-                        violation.message
-                    ))
-                    when (violation.riskLevel) {
-                        RiskLevel.HIGH -> high++
-                        RiskLevel.MEDIUM -> medium++
-                        RiskLevel.LOW -> low++
-                    }
-                }
-            }
-
+            val all = violations.values.flatten()
+            val high = all.count { it.riskLevel == RiskLevel.HIGH }
+            val medium = all.count { it.riskLevel == RiskLevel.MEDIUM }
+            val low = all.count { it.riskLevel == RiskLevel.LOW }
             val total = high + medium + low
-            headerLabel.text = "Scanned ${violations.size} files. Found $total potential issues."
+            // A hidden chip can't be clicked to clear its filter, so drop the filter when its count hits 0
+            val counts = mapOf(RiskLevel.HIGH to high, RiskLevel.MEDIUM to medium, RiskLevel.LOW to low)
+            if (severityFilter != null && counts[severityFilter] == 0) {
+                severityFilter = null
+                applyFilter()
+            }
             highCountLabel.text = "🔴 $high HIGH"
             mediumCountLabel.text = "🟠 $medium MEDIUM"
             lowCountLabel.text = "🔵 $low LOW"
@@ -329,10 +546,15 @@ class SafeGradleToolWindowFactory : ToolWindowFactory, DumbAware {
             mediumCountLabel.isVisible = medium > 0
             lowCountLabel.isVisible = low > 0
             exportButton.isVisible = total > 0
+            val fixableCount = all.count { BatchQuickFixEngine.isFixable(it) }
+            fixAllButton.isVisible = fixableCount > 0
+            fixAllButton.text = "Fix All ($fixableCount)"
             saveBaselineButton.isVisible = total > 0
             newOnlyToggle.isVisible = SafeGradleBaseline.exists(project)
 
-            // Record snapshot and update trend in header
+            // Record snapshot and update grade + trend in header
+            val grade = SecurityScore.grade(high, medium, low)
+            headerLabel.toolTipText = SecurityScore.FORMULA
             SafeGradleScanHistory.getInstance(project).record(high, medium, low)
             val snapshots = SafeGradleScanHistory.getInstance(project).snapshots()
             if (snapshots.size > 1) {
@@ -340,12 +562,11 @@ class SafeGradleToolWindowFactory : ToolWindowFactory, DumbAware {
                     val t = s.high + s.medium + s.low
                     if (s.high > 0) "🔴$t" else if (s.medium > 0) "🟠$t" else "🔵$t"
                 }
-                headerLabel.text = "Scanned ${violations.size} files. Found $total issues.  Trend: $trend"
+                headerLabel.text = "Security Grade: $grade — scanned ${violations.size} files, $total issues.  Trend: $trend"
             } else {
-                headerLabel.text = "Scanned ${violations.size} files. Found $total potential issues."
+                headerLabel.text = "Security Grade: $grade — scanned ${violations.size} files, $total potential issues."
             }
-
-            applyFilter()
         }
     }
 }
+
