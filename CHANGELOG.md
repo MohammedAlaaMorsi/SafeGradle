@@ -2,6 +2,32 @@
 
 ## [Unreleased]
 
+## [0.0.39]
+
+### ✨ New Features
+
+- **Remote Build Cache Safety**: Flags `isPush = true` inside a `remote { }` build-cache block — any developer machine can poison the shared cache with tampered outputs, so pushing must be restricted to CI (`isPush = System.getenv("CI") != null`). Also flags `allowUntrustedServer`, which disables TLS validation on the cache connection.
+- **Gradle Plugin Supply Chain**: Detects plugin IDs that impersonate popular Gradle plugins (one- or two-character typosquats), plugin IDs that were relocated and no longer receive security fixes, and unpinned plugin versions (`+`, `latest.release`, ranges, `-SNAPSHOT`) that can silently pull in a compromised release. Works in build scripts, `settings.gradle`, and `libs.versions.toml`.
+- **Dependency Verification**: Warns when `gradle/verification-metadata.xml` is missing, and flags weakened metadata — `verify-metadata` set to `false`, a `<trust>` rule that matches every artifact, or SHA-1/MD5-only checksums.
+- **Copyleft Licence Detection** (opt-in): Flags dependencies published under GPL, AGPL, or SSPL, which can require releasing your source code when distributed or offered as a service. Disabled by default since it needs Maven Central access; enable it under **Settings → Tools → SafeGradle**. LGPL, dual licences with a permissive option, and GPL with the Classpath Exception are not flagged.
+
+### 🔧 Improvements & Fixes
+
+- **Rule settings are now enforced by the scanner**: Disabling a check in **Settings → Tools → SafeGradle** now skips it entirely, and per-project severity overrides are applied to findings. The scan cache is cleared whenever rules change, since cache entries are keyed on file content only and would otherwise serve stale results.
+- **Every violation now carries its real check ID**: Checks that didn't set a `checkId` reported `unknown`, so severity overrides and suppressions silently never matched them.
+- **Real Gradle wrapper checksums**: The wrapper integrity check used placeholder checksum values. It now carries the official SHA-256 digests published by Gradle for 8.8 – 9.2.1 (`bin` and `all`), so genuine wrappers verify clean and a mismatch raises a HIGH-severity tampering alert.
+- **One-click wrapper auto-fix**: Missing or mismatched `distributionSha256Sum` findings now offer a fix that writes the correct checksum into `gradle-wrapper.properties`.
+- **Dependency confusion catches lookalike sub-groups**: Similarity is compared against the leading segments of the group ID, so names like `com.gooogle.guava` are detected.
+- **Shared Levenshtein helper**: Moved into `SecurityUtils` so the plugin-portal and dependency-confusion checks share one implementation.
+
+### 🧪 Testing
+
+- Added unit-test coverage for the new checks and the batch quick-fix engine — `BatchQuickFixEngineTest` (18 tests), `LicenseCheckTest` (12 tests), and new `BuildCacheCheck` / `PluginPortalCheck` / `DependencyVerificationCheck` cases in `SecurityCheckTests`. The suite now runs 139 tests, all green.
+
+### 🚀 Release Automation
+
+- Marketplace publishing is now automated: pushing a `v*.*.*` tag builds the plugin, runs the IntelliJ Plugin Verifier, gates on `tag == pluginVersion`, and publishes with that version's changelog notes.
+
 ## [0.0.38]
 
 ### ✨ New Features
@@ -10,11 +36,7 @@
 - **Pre-Sync Execution Guard**: Automatically intercepts Gradle project sync when high-severity security violations are detected. Alerts the developer with an actionable dialog to review findings before Gradle executes build scripts and resolves dependencies.
 - **Gradle Wrapper Integrity & Binary Verification**: Automated lookup for official Gradle release SHA-256 distribution checksums, local `gradle-wrapper.jar` binary hash verification, and editor quick-fix intention to remediate missing or tampered wrapper checksums.
 - **Lockfile & Transitive Dependency Scanning**: Scans Gradle lockfiles (`gradle.lockfile`) for vulnerable transitive dependencies, and checks for dependency confusion attack surfaces and undeclared public repository risks.
-- **Interactive Rules & Checks Manager**: Dedicated settings configuration panel (**Settings → Tools → SafeGradle**) to view, filter, and toggle individual security rules with custom descriptions and severity indicators. Every check can be switched off or have its severity raised/lowered per project, and the results cache is dropped automatically when rules change.
-- **Remote Build Cache Safety**: Flags `isPush = true` inside a `remote { }` build-cache block — any developer machine can poison the shared cache with tampered outputs, so pushing must be restricted to CI (`isPush = System.getenv("CI") != null`). Also flags `allowUntrustedServer`, which disables TLS validation on the cache connection.
-- **Gradle Plugin Supply Chain**: Detects plugin IDs that impersonate popular Gradle plugins (one- or two-character typosquats), plugin IDs that were relocated and no longer receive security fixes, and unpinned plugin versions (`+`, `latest.release`, ranges, `-SNAPSHOT`) that can silently pull in a compromised release. Works in build scripts, `settings.gradle`, and `libs.versions.toml`.
-- **Dependency Verification**: Warns when `gradle/verification-metadata.xml` is missing, and flags weakened metadata — `verify-metadata` set to `false`, a `<trust>` rule that matches every artifact, or SHA-1/MD5-only checksums.
-- **Copyleft Licence Detection** (opt-in): Flags dependencies published under GPL, AGPL, or SSPL, which can require releasing your source code when distributed or offered as a service. Disabled by default since it needs Maven Central access; enable it under **Settings → Tools → SafeGradle**. LGPL, dual licences with a permissive option, and GPL with the Classpath Exception are not flagged.
+- **Interactive Rules & Checks Manager**: Dedicated settings configuration panel (**Settings → Tools → SafeGradle**) to view, filter, and toggle individual security rules with custom descriptions and severity indicators.
 
 ## [0.0.37]
 
