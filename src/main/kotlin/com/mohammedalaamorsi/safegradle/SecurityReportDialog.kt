@@ -54,19 +54,19 @@ class SecurityReportDialog(
         val chipsPanel = JPanel(FlowLayout(FlowLayout.RIGHT, JBUI.scale(6), 0))
         if (high > 0) {
             chipsPanel.add(JLabel("🔴 $high HIGH").apply {
-                font = JBUI.Fonts.small().asBold()
+                font = JBUI.Fonts.smallFont().asBold()
                 foreground = JBColor(0xD32F2F, 0xEF5350)
             })
         }
         if (medium > 0) {
             chipsPanel.add(JLabel("🟠 $medium MED").apply {
-                font = JBUI.Fonts.small().asBold()
+                font = JBUI.Fonts.smallFont().asBold()
                 foreground = JBColor(0xE65100, 0xFFA726)
             })
         }
         if (low > 0) {
             chipsPanel.add(JLabel("🔵 $low LOW").apply {
-                font = JBUI.Fonts.small().asBold()
+                font = JBUI.Fonts.smallFont().asBold()
                 foreground = JBColor(0x757575, 0x9E9E9E)
             })
         }
@@ -163,7 +163,7 @@ class SecurityReportDialog(
         panel.add(scrollPane, BorderLayout.CENTER)
 
         val hintLabel = JBLabel("Double-click any row to jump to source code.").apply {
-            font = JBUI.Fonts.small()
+            font = JBUI.Fonts.smallFont()
             foreground = JBColor.GRAY
         }
         panel.add(hintLabel, BorderLayout.SOUTH)

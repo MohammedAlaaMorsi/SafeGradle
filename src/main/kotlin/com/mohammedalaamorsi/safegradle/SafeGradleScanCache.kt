@@ -50,6 +50,9 @@ class SafeGradleScanCache : PersistentStateComponent<SafeGradleScanCache.State> 
         }
     }
 
+    /** Drops every entry — needed when rule settings change, since entries are keyed on file content only. */
+    fun clear() = myState.cacheEntries.clear()
+
     fun invalidate(file: VirtualFile) {
         myState.cacheEntries.remove(file.path)
     }

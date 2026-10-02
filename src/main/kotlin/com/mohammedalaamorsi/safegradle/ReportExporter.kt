@@ -18,7 +18,7 @@ object ReportExporter {
         targetFile.writeText(sb.toString())
     }
 
-    fun exportToSarif(violations: Map<VirtualFile, List<SecurityViolation>>, targetFile: File, pluginVersion: String = "0.0.34") {
+    fun exportToSarif(violations: Map<VirtualFile, List<SecurityViolation>>, targetFile: File, pluginVersion: String = "0.0.38") {
         val rules = mutableSetOf<String>()
         violations.values.flatten().forEach { rules.add(it.checkId) }
 

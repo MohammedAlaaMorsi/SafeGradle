@@ -12,7 +12,8 @@ class SafeGradleSettings : PersistentStateComponent<SafeGradleSettings.State> {
         var ignoredViolations: MutableList<IgnoredViolation> = mutableListOf(),
         var enabledChecks: MutableMap<String, Boolean> = mutableMapOf(),
         var severityOverrides: MutableMap<String, String> = mutableMapOf(),
-        var enableOsvLookup: Boolean = true
+        var enableOsvLookup: Boolean = true,
+        var enableLicenseLookup: Boolean = false
     )
 
     data class IgnoredViolation(

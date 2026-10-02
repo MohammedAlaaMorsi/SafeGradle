@@ -368,4 +368,201 @@ class SecurityCheckTests : BasePlatformTestCase() {
         val file = myFixture.configureByText("build.gradle.kts", content)
         assertTrue(check.check(file.virtualFile, content, project).isEmpty())
     }
+
+    // ─── BuildCacheCheck ──────────────────────────────────────────────────
+
+    fun `test build cache flags unconditional push to remote cache`() {
+        val check = BuildCacheCheck()
+        val code = """
+            buildCache {
+                remote(HttpBuildCache) {
+                    url = uri("https://cache.example.com")
+                    isPush = true
+                }
+            }
+        """.trimIndent()
+        val file = myFixture.configureByText("settings.gradle.kts", code)
+        val violations = check.check(file.virtualFile, code, project)
+        assertEquals(1, violations.size)
+        assertEquals(RiskLevel.MEDIUM, violations[0].riskLevel)
+        assertEquals("build_cache", violations[0].checkId)
+    }
+
+    fun `test build cache flags push() call in remote block`() {
+        val check = BuildCacheCheck()
+        val code = """
+            buildCache {
+                remote {
+                    setPush(true)
+                }
+            }
+        """.trimIndent()
+        val file = myFixture.configureByText("settings.gradle", code)
+        assertTrue(check.check(file.virtualFile, code, project).any { it.riskLevel == RiskLevel.MEDIUM })
+    }
+
+    fun `test build cache allows ci-conditional push`() {
+        val check = BuildCacheCheck()
+        val code = """
+            buildCache {
+                remote(HttpBuildCache) {
+                    isPush = System.getenv("CI") != null
+                }
+            }
+        """.trimIndent()
+        val file = myFixture.configureByText("settings.gradle.kts", code)
+        assertTrue(check.check(file.virtualFile, code, project).isEmpty())
+    }
+
+    fun `test build cache ignores push outside a remote block`() {
+        val check = BuildCacheCheck()
+        val code = "isPush = true"
+        val file = myFixture.configureByText("settings.gradle.kts", code)
+        assertTrue(check.check(file.virtualFile, code, project).isEmpty())
+    }
+
+    fun `test build cache flags untrusted server as high risk`() {
+        val check = BuildCacheCheck()
+        val code = "isAllowUntrustedServer = true"
+        val file = myFixture.configureByText("settings.gradle.kts", code)
+        val violations = check.check(file.virtualFile, code, project)
+        assertNotEmpty(violations)
+        assertEquals(RiskLevel.HIGH, violations[0].riskLevel)
+    }
+
+    fun `test build cache only applies to settings files`() {
+        val check = BuildCacheCheck()
+        val code = "isPush = true"
+        val file = myFixture.configureByText("build.gradle.kts", code)
+        assertTrue(check.check(file.virtualFile, code, project).isEmpty())
+    }
+
+    // ─── PluginPortalCheck ────────────────────────────────────────────────
+
+    fun `test plugin portal flags typosquatted plugin id`() {
+        val check = PluginPortalCheck()
+        val code = """id("com.diffplug.spotles") version "6.25.0""""
+        val file = myFixture.configureByText("build.gradle.kts", code)
+        val violations = check.check(file.virtualFile, code, project)
+        assertNotEmpty(violations)
+        assertEquals(RiskLevel.HIGH, violations[0].riskLevel)
+        assertTrue(violations[0].message.contains("com.diffplug.spotless"))
+    }
+
+    fun `test plugin portal flags transposed-letters typosquat`() {
+        val check = PluginPortalCheck()
+        val code = """id("com.gradleup.shadwo") version "8.3.0""""
+        val file = myFixture.configureByText("build.gradle.kts", code)
+        val violations = check.check(file.virtualFile, code, project)
+        assertTrue(violations.any { it.riskLevel == RiskLevel.HIGH && it.message.contains("com.gradleup.shadow") })
+    }
+
+    fun `test plugin portal allows a plugin that extends a popular id`() {
+        val check = PluginPortalCheck()
+        val code = """id("com.android.application.debug") version "8.5.0""""
+        val file = myFixture.configureByText("build.gradle.kts", code)
+        assertTrue(check.check(file.virtualFile, code, project).isEmpty())
+    }
+
+    fun `test plugin portal passes the genuine plugin id`() {
+        val check = PluginPortalCheck()
+        val code = """id("com.gradle.develocity") version "3.17.5""""
+        val file = myFixture.configureByText("build.gradle.kts", code)
+        assertTrue(check.check(file.virtualFile, code, project).isEmpty())
+    }
+
+    fun `test plugin portal flags relocated plugin id`() {
+        val check = PluginPortalCheck()
+        val code = """id("com.github.johnrengelman.shadow") version "8.1.1""""
+        val file = myFixture.configureByText("build.gradle.kts", code)
+        val violations = check.check(file.virtualFile, code, project)
+        assertTrue(violations.any { it.riskLevel == RiskLevel.LOW && it.message.contains("com.gradleup.shadow") })
+    }
+
+    fun `test plugin portal flags dynamic version`() {
+        val check = PluginPortalCheck()
+        val code = """id("com.example.myplugin") version "1.0+""""
+        val file = myFixture.configureByText("build.gradle.kts", code)
+        val violations = check.check(file.virtualFile, code, project)
+        assertNotEmpty(violations)
+        assertEquals(RiskLevel.MEDIUM, violations[0].riskLevel)
+    }
+
+    fun `test plugin portal flags snapshot version`() {
+        val check = PluginPortalCheck()
+        val code = """id("com.example.myplugin") version "1.0-SNAPSHOT""""
+        val file = myFixture.configureByText("build.gradle.kts", code)
+        val violations = check.check(file.virtualFile, code, project)
+        assertNotEmpty(violations)
+        assertEquals(RiskLevel.LOW, violations[0].riskLevel)
+    }
+
+    fun `test plugin portal reads groovy plugin ids from settings`() {
+        val check = PluginPortalCheck()
+        val code = """id 'com.gradle.develocity' version '3.17.5'"""
+        val file = myFixture.configureByText("settings.gradle", code)
+        assertTrue(check.check(file.virtualFile, code, project).isEmpty())
+    }
+
+    fun `test plugin portal passes pinned plugin in version catalog`() {
+        val check = PluginPortalCheck()
+        val code = """
+            [plugins]
+            develocity = { id = "com.gradle.develocity", version = "3.17.5" }
+        """.trimIndent()
+        val file = myFixture.configureByText("libs.versions.toml", code)
+        assertTrue(check.check(file.virtualFile, code, project).isEmpty())
+    }
+
+    fun `test plugin portal flags dynamic version in version catalog`() {
+        val check = PluginPortalCheck()
+        val code = """
+            [plugins]
+            mine = { id = "com.example.myplugin", version = "1.0+" }
+        """.trimIndent()
+        val file = myFixture.configureByText("libs.versions.toml", code)
+        assertTrue(check.check(file.virtualFile, code, project).any { it.riskLevel == RiskLevel.MEDIUM })
+    }
+
+    // ─── DependencyVerificationCheck ──────────────────────────────────────
+
+    fun `test dependency verification flags disabled verify-metadata`() {
+        val check = DependencyVerificationCheck()
+        val content = "<verify-metadata>false</verify-metadata>"
+        val file = myFixture.configureByText("verification-metadata.xml", content)
+        val violations = check.check(file.virtualFile, content, project)
+        assertNotEmpty(violations)
+        assertEquals(RiskLevel.MEDIUM, violations[0].riskLevel)
+    }
+
+    fun `test dependency verification flags wildcard trust rule`() {
+        val check = DependencyVerificationCheck()
+        val content = """<trust group=".*" regex="true"/>"""
+        val file = myFixture.configureByText("verification-metadata.xml", content)
+        val violations = check.check(file.virtualFile, content, project)
+        assertNotEmpty(violations)
+        assertEquals(RiskLevel.HIGH, violations[0].riskLevel)
+    }
+
+    fun `test dependency verification flags weak checksums only`() {
+        val check = DependencyVerificationCheck()
+        val content = "<sha1>abc</sha1>"
+        val file = myFixture.configureByText("verification-metadata.xml", content)
+        val violations = check.check(file.virtualFile, content, project)
+        assertTrue(violations.any { it.riskLevel == RiskLevel.LOW && it.message.contains("SHA-1") })
+    }
+
+    fun `test dependency verification passes strong checksums`() {
+        val check = DependencyVerificationCheck()
+        val content = "<sha256>abc</sha256>"
+        val file = myFixture.configureByText("verification-metadata.xml", content)
+        assertTrue(check.check(file.virtualFile, content, project).isEmpty())
+    }
+
+    fun `test dependency verification stays silent for settings without a wrapper`() {
+        val check = DependencyVerificationCheck()
+        val code = "rootProject.name = \"x\""
+        val file = myFixture.configureByText("settings.gradle.kts", code)
+        assertTrue(check.check(file.virtualFile, code, project).isEmpty())
+    }
 }

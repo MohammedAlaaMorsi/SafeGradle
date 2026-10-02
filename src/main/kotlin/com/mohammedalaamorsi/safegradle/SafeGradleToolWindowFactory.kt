@@ -50,6 +50,7 @@ class SafeGradleToolWindowFactory : ToolWindowFactory, DumbAware {
         private val headerLabel = JLabel("Scan a project to see results here.")
         private val exportButton = JButton("Export Results")
         private val saveBaselineButton = JButton("Save Baseline")
+        private val fixAllButton = JButton("Fix All")
         private val newOnlyToggle = JToggleButton("New Only", false)
         private val groupByCheckToggle = JToggleButton("Group by Check", false)
 
@@ -60,9 +61,8 @@ class SafeGradleToolWindowFactory : ToolWindowFactory, DumbAware {
 
         // Filter controls
         private val searchField = JTextField(20)
-        private val showHighToggle = JToggleButton("🔴 HIGH", false)
-        private val showMediumToggle = JToggleButton("🟠 MED", false)
-        private val showLowToggle = JToggleButton("🔵 LOW", false)
+        // Single severity filter driven by the summary chips; null = show all
+        private var severityFilter: RiskLevel? = null
 
         init {
             project.messageBus.connect().subscribe(SafeGradleResultService.TOPIC, this)
@@ -76,10 +76,10 @@ class SafeGradleToolWindowFactory : ToolWindowFactory, DumbAware {
             mediumCountLabel.font = labelFont
             lowCountLabel.font = labelFont
 
-            // The summary labels double as clickable filter chips, kept in sync with the toggles below.
-            makeSeverityChip(highCountLabel, showHighToggle)
-            makeSeverityChip(mediumCountLabel, showMediumToggle)
-            makeSeverityChip(lowCountLabel, showLowToggle)
+            // The summary labels are the severity filter: click one to show only it, click again to clear.
+            makeSeverityChip(highCountLabel, RiskLevel.HIGH)
+            makeSeverityChip(mediumCountLabel, RiskLevel.MEDIUM)
+            makeSeverityChip(lowCountLabel, RiskLevel.LOW)
 
             summaryPanel.add(highCountLabel)
             summaryPanel.add(mediumCountLabel)
@@ -118,6 +118,11 @@ class SafeGradleToolWindowFactory : ToolWindowFactory, DumbAware {
             }
             summaryPanel.add(exportButton)
 
+            fixAllButton.isVisible = false
+            fixAllButton.toolTipText = "Apply every safe automatic fix (HTTPS, jcenter → mavenCentral, wrapper checksum, dependency upgrades). Undo with Ctrl+Z."
+            fixAllButton.addActionListener { fixAll() }
+            summaryPanel.add(fixAllButton)
+
             saveBaselineButton.isVisible = false
             saveBaselineButton.toolTipText = "Save current results as baseline — only NEW violations will be shown on future scans"
             saveBaselineButton.addActionListener {
@@ -143,9 +148,6 @@ class SafeGradleToolWindowFactory : ToolWindowFactory, DumbAware {
             val filterPanel = JPanel(FlowLayout(FlowLayout.LEFT, 8, 4))
             filterPanel.add(JLabel("Filter:"))
             filterPanel.add(searchField)
-            filterPanel.add(showHighToggle)
-            filterPanel.add(showMediumToggle)
-            filterPanel.add(showLowToggle)
             filterPanel.border = BorderFactory.createMatteBorder(0, 0, 1, 0, Color.LIGHT_GRAY)
 
             val filterListener = { _: Any -> applyFilter() }
@@ -154,9 +156,6 @@ class SafeGradleToolWindowFactory : ToolWindowFactory, DumbAware {
                 override fun removeUpdate(e: javax.swing.event.DocumentEvent) = filterListener(e)
                 override fun changedUpdate(e: javax.swing.event.DocumentEvent) = filterListener(e)
             })
-            showHighToggle.addActionListener { applyFilter() }
-            showMediumToggle.addActionListener { applyFilter() }
-            showLowToggle.addActionListener { applyFilter() }
 
             val northWrapper = JPanel(BorderLayout())
             northWrapper.add(topPanel, BorderLayout.NORTH)
@@ -233,9 +232,9 @@ class SafeGradleToolWindowFactory : ToolWindowFactory, DumbAware {
         private fun applyFilter() {
             val baseline = if (newOnlyToggle.isSelected) SafeGradleBaseline.load(project) else emptySet()
             val text = searchField.text
-            val highOn = showHighToggle.isSelected
-            val medOn  = showMediumToggle.isSelected
-            val lowOn  = showLowToggle.isSelected
+            val highOn = severityFilter == RiskLevel.HIGH
+            val medOn  = severityFilter == RiskLevel.MEDIUM
+            val lowOn  = severityFilter == RiskLevel.LOW
 
             syncSeverityChips()
 
@@ -256,27 +255,30 @@ class SafeGradleToolWindowFactory : ToolWindowFactory, DumbAware {
             }
         }
 
-        /** Keeps the big severity chips visually in sync with the toggle buttons. */
+        /** Highlights the chip matching the active severity filter. */
         private fun syncSeverityChips() {
-            for ((label, toggle) in listOf(
-                highCountLabel to showHighToggle,
-                mediumCountLabel to showMediumToggle,
-                lowCountLabel to showLowToggle
+            for ((label, level) in listOf(
+                highCountLabel to RiskLevel.HIGH,
+                mediumCountLabel to RiskLevel.MEDIUM,
+                lowCountLabel to RiskLevel.LOW
             )) {
-                label.isOpaque = toggle.isSelected
-                label.background = if (toggle.isSelected) UIManager.getColor("List.selectionBackground") else null
+                val selected = severityFilter == level
+                label.isOpaque = selected
+                label.background = if (selected) UIManager.getColor("List.selectionBackground") else null
                 label.repaint()
             }
         }
 
-        /** Makes a summary count label act as a clickable filter chip bound to [toggle]. */
-        private fun makeSeverityChip(label: JLabel, toggle: JToggleButton) {
+        /** Makes a summary count label a clickable filter chip for [level]. */
+        private fun makeSeverityChip(label: JLabel, level: RiskLevel) {
             label.border = EmptyBorder(5, 5, 5, 15)
             label.cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
-            label.toolTipText = "Click to show only these violations; click again to clear"
+            label.toolTipText = "Click to show only $level violations; click again to show all"
             label.addMouseListener(object : MouseAdapter() {
-                override fun mouseClicked(e: MouseEvent) {
-                    toggle.isSelected = !toggle.isSelected
+                // mousePressed, not mouseClicked: a click with slight mouse movement never fires mouseClicked
+                override fun mousePressed(e: MouseEvent) {
+                    if (!SwingUtilities.isLeftMouseButton(e)) return
+                    severityFilter = if (severityFilter == level) null else level
                     applyFilter()
                 }
             })
@@ -399,18 +401,8 @@ class SafeGradleToolWindowFactory : ToolWindowFactory, DumbAware {
 
         private fun applyWrapperChecksumFix(violation: SecurityViolation, checksum: String, document: com.intellij.openapi.editor.Document) {
             val fileDocManager = com.intellij.openapi.fileEditor.FileDocumentManager.getInstance()
-            val text = document.text
-            val propKey = "distributionSha256Sum="
-
             com.intellij.openapi.command.WriteCommandAction.runWriteCommandAction(project) {
-                if (text.contains(propKey)) {
-                    val regex = Regex("""distributionSha256Sum\s*=.*""")
-                    val newText = regex.replace(text, "distributionSha256Sum=$checksum")
-                    document.setText(newText)
-                } else {
-                    val sep = if (text.endsWith("\n")) "" else "\n"
-                    document.insertString(document.textLength, "${sep}distributionSha256Sum=$checksum\n")
-                }
+                document.setText(BatchQuickFixEngine.fixWrapper(document.text, checksum))
                 fileDocManager.saveDocument(document)
             }
 
@@ -419,6 +411,63 @@ class SafeGradleToolWindowFactory : ToolWindowFactory, DumbAware {
                 val merged = IncrementalScan.rescanFiles(project, listOf(violation.file))
                 com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater {
                     SafeGradleResultService.getInstance(project).setResults(merged)
+                }
+            }
+        }
+
+        /**
+         * Applies every safe automatic fix in one undoable command, then rescans the touched files.
+         * Violations on the same line are applied in sequence so e.g. HTTPS + version upgrade both land.
+         */
+        private fun fixAll() {
+            val fixable = currentViolations.values.flatten().filter { BatchQuickFixEngine.isFixable(it) }
+            if (fixable.isEmpty()) {
+                Messages.showInfoMessage(project, "None of the current findings have a safe automatic fix.", "SafeGradle")
+                return
+            }
+            val files = fixable.map { it.file }.distinct()
+            val answer = Messages.showYesNoDialog(
+                project,
+                "Apply ${fixable.size} automatic fix(es) across ${files.size} file(s)?\n\n" +
+                    "HTTP → HTTPS assumes the host serves HTTPS — check internal repositories after applying.\n" +
+                    "All changes can be reverted with a single Undo (Ctrl+Z / Cmd+Z).",
+                "SafeGradle: Fix All", Messages.getQuestionIcon()
+            )
+            if (answer != Messages.YES) return
+
+            val fileDocManager = com.intellij.openapi.fileEditor.FileDocumentManager.getInstance()
+            var applied = 0
+            com.intellij.openapi.command.WriteCommandAction.writeCommandAction(project)
+                .withName("SafeGradle: Fix All")
+                .withGlobalUndo()
+                .run<RuntimeException> {
+                    for ((file, violations) in fixable.groupBy { it.file }) {
+                        val document = fileDocManager.getDocument(file) ?: continue
+                        if (file.name == BatchQuickFixEngine.WRAPPER_FILE) {
+                            val checksum = violations.first().fixVersion ?: continue
+                            document.setText(BatchQuickFixEngine.fixWrapper(document.text, checksum))
+                            applied += violations.size
+                        } else {
+                            for ((line, onLine) in violations.groupBy { it.line }) {
+                                val idx = line - 1
+                                if (idx < 0 || idx >= document.lineCount) continue
+                                val range = com.intellij.openapi.util.TextRange(document.getLineStartOffset(idx), document.getLineEndOffset(idx))
+                                val original = document.getText(range)
+                                val fixed = onLine.fold(original) { text, v ->
+                                    BatchQuickFixEngine.fixLine(v.checkId, v.message, v.fixVersion, text)?.also { applied++ } ?: text
+                                }
+                                if (fixed != original) document.replaceString(range.startOffset, range.endOffset, fixed)
+                            }
+                        }
+                        fileDocManager.saveDocument(document)
+                    }
+                }
+
+            com.intellij.openapi.application.ApplicationManager.getApplication().executeOnPooledThread {
+                val merged = IncrementalScan.rescanFiles(project, files)
+                com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater {
+                    SafeGradleResultService.getInstance(project).setResults(merged)
+                    Messages.showInfoMessage(project, "Applied $applied fix(es). Press Ctrl+Z / Cmd+Z in an edited file to undo.", "SafeGradle: Fix All")
                 }
             }
         }
@@ -483,6 +532,12 @@ class SafeGradleToolWindowFactory : ToolWindowFactory, DumbAware {
             val medium = all.count { it.riskLevel == RiskLevel.MEDIUM }
             val low = all.count { it.riskLevel == RiskLevel.LOW }
             val total = high + medium + low
+            // A hidden chip can't be clicked to clear its filter, so drop the filter when its count hits 0
+            val counts = mapOf(RiskLevel.HIGH to high, RiskLevel.MEDIUM to medium, RiskLevel.LOW to low)
+            if (severityFilter != null && counts[severityFilter] == 0) {
+                severityFilter = null
+                applyFilter()
+            }
             highCountLabel.text = "🔴 $high HIGH"
             mediumCountLabel.text = "🟠 $medium MEDIUM"
             lowCountLabel.text = "🔵 $low LOW"
@@ -491,6 +546,9 @@ class SafeGradleToolWindowFactory : ToolWindowFactory, DumbAware {
             mediumCountLabel.isVisible = medium > 0
             lowCountLabel.isVisible = low > 0
             exportButton.isVisible = total > 0
+            val fixableCount = all.count { BatchQuickFixEngine.isFixable(it) }
+            fixAllButton.isVisible = fixableCount > 0
+            fixAllButton.text = "Fix All ($fixableCount)"
             saveBaselineButton.isVisible = total > 0
             newOnlyToggle.isVisible = SafeGradleBaseline.exists(project)
 
